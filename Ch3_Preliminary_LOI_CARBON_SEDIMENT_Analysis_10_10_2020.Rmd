@@ -89,8 +89,8 @@ levels(Compation_Ratio$Site)
 
 
 #LOI Data
-LOI=read.csv("data/Carbon/LOI_Data_version_03_03_2021.csv")
-head(LOI)
+LOI=read.csv("data/Carbon/LOI_Data_version_03_18_2021.csv")
+# head(LOI)
 names(LOI)
 
 LOI_QAQC=LOI[c(2:8,11:12,23:35)]
@@ -108,6 +108,10 @@ levels(as.factor(Compation_Ratio$Quadrat))
 levels(LOI_QAQC$Site)
 levels(as.factor(LOI_QAQC$Quadrat))
 
+
+## GOTTA CHECK THE CALCULATIONS REALLY CLOSELY. I THINK WE NEED TO MULTIPLY PERCENTAGES BY GRAMS BEFORE DIVDING BY THE CORRECTED VOLUME.
+# RIGHT NOW I'M CALCULATING DENSITIES AND THEN MULTIPLYING THE PERCENTAGES
+
 LOI_QAQC=LOI_QAQC%>%
   dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*(1/Compaction_Ratio)),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
  dplyr::mutate(Sample_Density_g_per_ml=Sample_Weight_gDW/Slice_Volume,
@@ -124,12 +128,12 @@ LOI_QAQC=LOI_QAQC%>%
          Percent_Carbon=ifelse(Percent_Carbon<0,0.001,Percent_Carbon))%>%
   dplyr::mutate(Sediment_Depth_cm=Slice_Height_Corrected_cm*Slice_Number,
          Sediment_Depth_Group=ifelse(Sediment_Depth_cm<=10,"0-10cm",ifelse(Sediment_Depth_cm>10 & Sediment_Depth_cm<=20,"10-20cm",ifelse(Sediment_Depth_cm>20 & Sediment_Depth_cm<=30,"20-30cm",ifelse(Sediment_Depth_cm>30 & Sediment_Depth_cm<=40,"30-40cm",ifelse(Sediment_Depth_cm>40 & Sediment_Depth_cm<=50,"40-50cm","below50cm"))))))%>%
-  dplyr::select(1:12,17:18,25:27,29,31:34)
+  dplyr::select(1:12,17:18,22,25:27,29,31:34)
 
-write.csv(LOI_QAQC,file="data_output/LOI_Data_version_QAQC_03_03_2020.csv")
+write.csv(LOI_QAQC,file="data_output/LOI_Data_version_QAQC_03_18_2020.csv")
 
 #Grain size analysis 
-Grainsize=read.csv("data/Carbon/Grainsize_Data_version_03_03_2021.csv")
+Grainsize=read.csv("data/Carbon/Grainsize_Data_version_03_18_2021.csv")
 Grainsize=as.data.frame(Grainsize)
 head(Grainsize)
 summary(Grainsize)
@@ -164,7 +168,7 @@ names(Grainsize_QAQC)
 Grainsize_QAQC=Grainsize_QAQC%>%
   mutate(Percent_Sands=Percent_Coarse+Percent_Medium+Percent_Fine)
 
-write.csv(Grainsize_QAQC,file="data_output/Grainsize_Data_version_QAQC_03_03_2021.csv")
+write.csv(Grainsize_QAQC,file="data_output/Grainsize_Data_version_QAQC_03_18_2021.csv")
 
 
 ```
@@ -177,7 +181,6 @@ names(LOI_QAQC)
 ggplot(Compation_Ratio,aes(x=Compaction_Ratio))+geom_histogram()+xlab("Compaction Ratio") +ylab("Number of Cores")
 
 ggplot(Compation_Ratio,aes(x=Core_Length_Corrected_cm))+geom_histogram()+xlab("Uncompressed Core Length (cm)") +ylab("Number of Cores")
-
 
 ggplot(LOI_QAQC,aes(x=(Sediment_Depth_cm)))+geom_histogram(binwidth = 1)+xlab("Sediment Depth (cm)") +ylab("Number of Core Slices")
 
@@ -200,14 +203,18 @@ names(LOI_QAQC)
 
 LOI_QAQC_By_Site_Slice=LOI_QAQC%>%
   dplyr::group_by(Site,Factor,Quadrat,Bagged_Slice_Number,Slice_Number,Slice_Height_Corrected_cm,Sediment_Depth_cm,Sediment_Depth_Group)%>%
-  dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE),Organic_Density_g_per_ml=mean(Organic_Density_g_per_ml,na.rm=TRUE),Inorganic_Density_g_per_ml=mean(Inorganic_Density_g_per_ml,na.rm=TRUE),Percent_Carbon=mean(Percent_Carbon,na.rm=TRUE),Rhizome_Density_g_per_ml=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),Shell_Density_g_per_ml=mean(Shell_Density_g_per_ml,na.rm=TRUE))%>%
+  dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE),Organic_Density_g_per_ml=mean(Organic_Density_g_per_ml,na.rm=TRUE),Inorganic_Density_g_per_ml=mean(Inorganic_Density_g_per_ml,na.rm=TRUE),Percent_Carbon=mean(Percent_Carbon,na.rm=TRUE),Rhizome_Density_g_per_ml=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),Shell_Density_g_per_ml=mean(Shell_Density_g_per_ml,na.rm=TRUE),Sediment_Density_g_per_ml=mean(Sediment_Density_g_per_ml,na.rm=TRUE))%>%
   ungroup()%>%
   filter(is.na(OLOI)==FALSE)%>%
-  dplyr::mutate(Organic_Carbon_Density_g_per_ml=(Percent_Carbon/100) * Organic_Density_g_per_ml,
+  dplyr::mutate(Organic_Carbon_Density_g_per_ml=(Organic_Density_g_per_ml/100) * Sediment_Density_g_per_ml,
          Inorganic_Carbon_Density_g_per_ml=(Inorganic_Density_g_per_ml* 0.12),
          Total_Carbon_Density_g_per_ml=Organic_Carbon_Density_g_per_ml+Inorganic_Carbon_Density_g_per_ml)
 
-summary(LOI_QAQC_By_Site_Slice)
+
+
+LOI_QAQC_By_Site_Slice%>%
+  dplyr::group_by(Sediment_Depth_Group,Factor)%>%
+  dplyr::summarise(mean=mean(OLOI),n=n())
 
 ggplot(LOI_QAQC_By_Site_Slice,aes(x=(Sediment_Depth_cm)))+geom_histogram(binwidth = 1)+xlab("Sediment Depth (cm)") +ylab("Frequency")
 
@@ -225,7 +232,7 @@ ggplot(LOI_QAQC_By_Site_Slice,aes(y=as.integer(ILOI),fill=Factor),na.rm=TRUE)+ge
 #Inorganic Density
 ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Inorganic_Density_g_per_ml),fill=Factor),na.rm=TRUE)+geom_boxplot() + ylab("Carbonate Density of Slice") + xlab("") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ ggtitle("Carbonate Density by Sediment Depth Bin (g/ ml)")
 
-#%C
+#% Organic C
 ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Percent_Carbon),fill=Factor),na.rm=TRUE)+geom_boxplot() + ylab("Organic Carbon Per Slice") + ylab("") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ggtitle("Organic Carbon by Sediment Depth Bin (%)")
 
 #Organic Carbon Density
@@ -243,6 +250,14 @@ LOI_QAQC_By_Site_Slice%>%
   dplyr::summarize(mean=mean(OLOI,na.rm=TRUE))%>%
   mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
               ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OM % of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Organic Matter by Sediment Depth ")+coord_flip()
+
+# Percent Organic Carbon
+LOI_QAQC_By_Site_Slice%>%
+  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::summarize(mean=mean(Percent_Carbon,na.rm=TRUE))%>%
+  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OC % of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Percent Organic Carbon by Sediment Depth ")+coord_flip()
 
 # Organic Carbon Density
 LOI_QAQC_By_Site_Slice%>%
@@ -329,7 +344,7 @@ seagrass_surveys_By_Site=join(seagrass_surveys_By_Site,Environmental_Factors_Sit
 
 seagrass_survey_AND_Clippings_By_Site=join(seagrass_surveys_By_Site,seagrass_clippings_Site[c(1,16,15,12,11,6)],by="Site")
 
-write.csv(seagrass_survey_AND_Clippings_By_Site,"data_output/Seagrass_Clippings_QAQC_Site_03_03_2021.csv")
+write.csv(seagrass_survey_AND_Clippings_By_Site,"data_output/Seagrass_Clippings_QAQC_Site_03_18_2021.csv")
 
 
 
@@ -345,9 +360,6 @@ Grainsize_QAQC_By_Site=Grainsize_QAQC%>%
   ungroup()
 names(Grainsize_QAQC_By_Site)
 ```
-
-
-
 
 
 
