@@ -1,0 +1,404 @@
+---
+title: "Ch_3_Nursery_Habitat_Predictions"
+author: "Jenn_McHenry"
+date: "1/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(utils)
+library(mgcv)
+library(pROC)
+library(tools)
+library(dplyr)
+library(ggplot2)
+library(nlme)
+library(mgcv)
+# library(doBy)
+library(plyr)
+# Use dredge to test sub-models
+library(MuMIn)
+library(raster)
+# library(FSSgam)
+library(nnet)
+library(doParallel)
+library(gratia)
+library(virtualspecies)
+
+
+# Set the primary working directories
+
+odds_to_prob=function(x){
+        prob<-exp(x)/(1+exp(x))
+        return(prob)
+}
+
+
+
+predfun <- function(model, data) {
+  v <- mgcv::predict.gam(object=model, newdata=data, type="response",se.fit=FALSE)
+  return(v)
+  # cbind(p=as.vector(v$fit),se=as.vector(v$se.fit))
+}
+
+
+```
+
+#Loagind the final probabiliity nursery habiat models 
+
+```{r}
+
+# Spotted Seatrout
+spotted_seatrout=readRDS("model_versions/Spotted_Seatrout_binomial_gam.rds")
+
+par(mfrow=c(2,3));plot.gam(spotted_seatrout,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+
+draw(spotted_seatrout)
+
+#Gray Snapper
+gray_snapper=readRDS("model_versions/Gray_Snapper_binomial_gam.rds")
+
+par(mfrow=c(2,3));plot.gam(gray_snapper,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+
+draw(gray_snapper)
+
+# Lane Snapper
+lane_snapper=readRDS("model_versions/Lane_Snapper_binomial_gam.rds")
+
+par(mfrow=c(2,3));plot.gam(lane_snapper,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+draw(lane_snapper)
+
+#Pink Shrimp
+pink_shrimp=readRDS("model_versions/Pink_Shrimp_binomial_gam.rds")
+
+par(mfrow=c(2,3));plot.gam(pink_shrimp,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+draw(pink_shrimp)
+
+#White Grunt
+white_grunt=readRDS("model_versions/WhiteGrunt_binomial_gam.rds")
+
+par(mfrow=c(2,3));plot.gam(white_grunt,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+
+draw(white_grunt)
+
+#Sheepshead
+sheepshead=readRDS("model_versions/Sheepshead_binomial_gam.rds")
+
+par(mfrow=c(2,3));plot.gam(sheepshead,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+
+draw(sheepshead)
+
+```
+
+#preparing input datasts for model predictions of nursery habitat (current seagrass conditions)
+```{r}
+#loading raster grid for inshore areas
+rs_stack_study_region_inshore_grid=stack("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Predictors_Inshore_Raster_Stack/Predictors_Inshore_Raster_Stack.grd")
+names(rs_stack_study_region_inshore_grid)
+
+
+rs_stack_study_region_inshore_grid=raster::subset(rs_stack_study_region_inshore_grid,c(1:3,20,54,62,74,84,89:93))
+names(rs_stack_study_region_inshore_grid)
+names(rs_stack_study_region_inshore_grid)[8]<-c("pH.Mean")
+# summary(rs_stack_study_region_inshore_grid)
+
+
+
+# library(rgdal)
+# FWC_Seagrass_Map=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Spatial_Patterns_EcosystmServiceBenefits/data/fwc_seagrass.tif")
+# crs(FWC_Seagrass_Map)<-crs(rs_stack_study_region_inshore_grid)
+# 
+# 
+# FWC_Seagrass_Map=raster::resample(FWC_Seagrass_Map,rs_stack_study_region_inshore_grid[[1]], method="bilinear")
+# 
+# names(FWC_Seagrass_Map)<-c("FWC_Seagrass_Map")
+# FWC_Seagrass_Map[FWC_Seagrass_Map>0]<-1
+# 
+# FWC_Seagrass_Map_PA=FWC_Seagrass_Map
+
+  
+BottomVegCover=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Seagrass_Cover_MeanAnnual_Current_Corrected_CorExp.tif")
+names(BottomVegCover)<-c("BottomVegCover")
+# BottomVegCover[is.na(BottomVegCover)==TRUE]<-0
+raster::plot(BottomVegCover,colNA="blue")
+
+Total_Predicted_Seagrass=BottomVegCover
+Total_Predicted_Seagrass[Total_Predicted_Seagrass<=5]<-0
+Total_Predicted_Seagrass[Total_Predicted_Seagrass>5]<-1
+Total_Predicted_Seagrass[Total_Predicted_Seagrass==0]<-NA
+
+
+TH_PA=raster(x="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/TH_PA_MeanAnnual_Current_Corrected.tif")
+names(TH_PA)<-c("TH_PA")
+TH_PA[TH_PA>0.05]<-1
+TH_PA[TH_PA<=0.05]<-0
+# TH_PA[is.na(TH_PA)==TRUE]<-0
+raster::plot(TH_PA,colNA="blue")
+TH_PA=as.factor(TH_PA)
+
+SY_PA=raster(x="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/SY_PA_MeanAnnual_Current_Corrected.tif")
+names(SY_PA)<-c("SY_PA")
+SY_PA[SY_PA>0.05]<-1
+SY_PA[SY_PA<=0.05]<-0
+SY_PA=as.factor(SY_PA)
+
+# SY_PA[is.na(SY_PA)==TRUE]<-0
+raster::plot(SY_PA,colNA="blue")
+
+
+HA_PA=raster(x="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/HA_PA_MeanAnnual_Current_Corrected.tif")
+
+HA_PA<-convertToPA(HA_PA,PA.method = "threshold",beta=0.05)
+HA_PA<-HA_PA$pa.raster
+names(HA_PA)<-c("HA_PA")
+
+
+plot(HA_PA)
+# NULL_rs<-BottomVegCover
+# NULL_rs[NULL_rs>0]<-0
+# 
+# HA_PA<-overlay(NULL_rs,HA_PA,fun=function(a,b){return(a+b)})
+# 
+# HA_PA[HA_PA<=0.05]<-0
+# HA_PA[HA_PA>0.05]<-1
+HA_PA=as.factor(HA_PA)
+# # HA_PA[is.na(HA_PA)==TRUE]<-0
+# raster::plot(HA_PA,colNA="blue")
+# writeRaster(HA_PA,"data/HA_PA.tif",format="GTiff",overwrite=TRUE)
+
+Dist_To_River=rs_stack_study_region_inshore_grid$Dist_To_River
+Dist_To_River[Dist_To_River>=10]<-10
+
+Dist_To_Shore=rs_stack_study_region_inshore_grid$Dist_To_Shore
+Dist_To_Shore[Dist_To_Shore>=15]<-15
+
+Depth=rs_stack_study_region_inshore_grid$Depth
+Depth[Depth>0]<-NA
+Mud=rs_stack_study_region_inshore_grid$Mud
+Mud=as.factor(Mud)
+
+
+rs_stack_study_region_inshore_grid$BottomVegCover<-BottomVegCover
+# rs_stack_study_region_inshore_grid$TH_PA<-TH_PA
+# rs_stack_study_region_inshore_grid$SY_PA<-SY_PA
+rs_stack_study_region_inshore_grid$HA_PA<-HA_PA
+# rs_stack_study_region_inshore_grid$HA_PA<-Mud #FIX THIS
+rs_stack_study_region_inshore_grid$Mud<-Mud
+# rs_stack_study_region_inshore_grid$FWC_Seagrass_Map_PA<-FWC_Seagrass_Map_PA
+rs_stack_study_region_inshore_grid$Dist_To_River<-Dist_To_River
+rs_stack_study_region_inshore_grid$Dist_To_Shore<-Dist_To_Shore
+
+zero_four_meters=rs_stack_study_region_inshore_grid$Depth
+zero_four_meters[zero_four_meters<=-4]<-NA
+zero_four_meters[zero_four_meters>=0]<-NA
+# plot(zero_four_meters,colNA="blue")
+
+writeRaster(zero_four_meters,"data/FourMeter_Depth_Zone.tif",format="GTiff",overwrite=TRUE)
+
+```
+#Nursery Habitat Presence Absence  Model Selection
+```{r}
+
+data=read.csv(file="data/FIM_Final_NurserySpecies_1997_2017_wideform_meancovaraites_QAQC.csv")
+
+
+levels(as.factor(data$Gear_Type))
+
+data=data%>%
+  filter(Gear_Type=="SmallSeine" | Gear_Type=="OtterTrawl")
+
+#distribution 
+data%>%
+  dplyr::group_by(Gear_Type)%>%
+ dplyr::summarize(
+            # BD=sum(Black.Drum.PA>0),
+            AC=sum(Atlantic.Croaker.PA>0),
+            # BSB=sum(Black.Sea.Bass.PA>0),
+            # FSC=sum(Florida.Stone.Crab.PA>0),
+            # CS=sum(Common.Snook.PA>0),
+            CJ=sum(Crevalle.Jack.PA>0),
+            # G=sum(Gag.PA>0),
+            GS=sum(Gray.Snapper.PA>0),
+            LS=sum(Lane.Snapper.PA>0),
+            PS=sum(Pink.Shrimp.PA>0),
+            RD=sum(Red.Drum.PA>0),
+            # RS=sum(Red.Snapper.PA>0),
+            SH=sum(Sheepshead.PA>0),
+            SST=sum(Spotted.Seatrout.PA>0),
+            # SL=sum(Spiny.Lobster.PA>0),
+            WG=sum(White.Grunt.PA>0))
+
+# `summarise()` ungrouping output (override with `.groups` argument)
+# # A tibble: 2 x 10
+#   Gear_Type     AC    CJ    GS    LS    PS    RD    SH   SST    WG
+#   <fct>      <int> <int> <int> <int> <int> <int> <int> <int> <int>
+# 1 OtterTrawl   169     2    43   223    14    32    29   125    41
+# 2 SmallSeine    16    31   370   156   267   846   246   882    45
+# > 
+
+#Model Selection Thinned 0.08km fitting data
+##################################################################################
+cat.preds=c("Sand","Mud","Rocks","Seagrass_PA","TH_PA","SY_PA","HA_PA","ST_Mangroves","ST_Oysters")
+null.vars=c("Gear_Type")
+cont.preds=c("Depth","Dist_To_Shore","Dist_To_River","Primary.productivity.Max","Dissolved.oxygen.Min","Temperature.Min","Salinity.Min","BottomVegCover","Latitude")
+
+
+data=data%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Seagrass_PA=as.factor(Seagrass_PA),ST_Mangroves=as.factor(ST_Mangroves),ST_Oysters=as.factor(ST_Oysters),Mud=as.factor(Mud),Sand=as.factor(Sand),Rocks=as.factor(Rocks),Gear_Type=as.factor(Gear_Type))
+
+summary(data$Latitude)
+summary(data$Longitude)
+summary(data$Depth)
+summary(data$Dist_To_Shore)
+summary(data$Dist_To_River)
+summary(data$Primary.productivity.Max)
+summary(data$Dissolved.oxygen.Min)
+summary(data$BottomVegCover)
+summary(data$Mud)
+
+summary(rs_stack_study_region_inshore_grid$Latitude)
+summary(rs_stack_study_region_inshore_grid$Longitude)
+summary(rs_stack_study_region_inshore_grid$Depth)
+summary(rs_stack_study_region_inshore_grid$Dist_To_Shore)
+summary(rs_stack_study_region_inshore_grid$Dist_To_River)
+summary(rs_stack_study_region_inshore_grid$Primary.productivity.Max)
+summary(rs_stack_study_region_inshore_grid$Dissolved.oxygen.Min)
+summary(rs_stack_study_region_inshore_grid$BottomVegCover)
+summary(rs_stack_study_region_inshore_grid$Mud)
+
+
+```
+
+
+# Probability model predictions
+```{r}
+pink_shrimp2=update(pink_shrimp,.~.-s(Dist_To_Shore,by=HA_PA,bs="ts",k=4)+s(Dist_To_Shore,bs="ts",k=4),data=pink_shrimp$model)
+
+#species without year
+species=c("white_grunt","gray_snapper","lane_snapper")
+
+
+par(mfrow=c(2,3));plot.gam(pink_shrimp,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+
+#winter predictions only (december - february)
+#spring would be (march - may), summer would be (june august august), fall would be (setepmber- november )
+
+monthly_rasters=foreach(i=1:length(species),.packages = "raster",.combine = "stack") %do% {
+  model_version<-species[i]
+  model_object<-get(model_version)
+  dat<-as.data.frame(model_object$model)
+  # model_object_updated<-update(model_object,.~.-s(Gear_Type,bs="re"),data=dat)
+  prediction_stack<-rs_stack_study_region_inshore_grid
+  foreach(k=9:12,.packages = "raster",.combine="stack") %do% {
+  # foreach(k=1:12,.packages = "raster",.combine="stack") %do% {
+      prediction_stack$month<-k
+      rs<-raster::predict(object=prediction_stack,model=model_object,fun=predfun, const=(data.frame(year=2017,Gear_Type=0)),progress="text")
+      # rs=mask(x=rs,mask=zero_four_meters,updatevalue=0)
+      species_month=paste(model_version,"_",k,sep="")
+      names(rs)<-species_month
+      writeRaster(rs, filename=paste("model_output/", species_month, ".tif", sep=""), format="GTiff",overwrite=TRUE,sep="")
+      return(rs)
+  }
+}
+
+
+
+# "pink_shrimp","spotted_seatrout","sheepshead"
+
+year=c(2019,2020)
+
+pink_monthly_rasters=foreach(i=1:length(year),.packages = "raster",.combine = "stack") %do% {
+  model_version<-c("pink_shrimp")
+  model_object<-get(model_version)
+  dat<-as.data.frame(model_object$model)
+  # model_object_updated<-update(model_object,.~.-s(Gear_Type,bs="re"),data=dat)
+  prediction_stack<-rs_stack_study_region_inshore_grid
+  prediction_stack$year<-year[i]
+  foreach(k=1:12,.packages = "raster",.combine="stack") %do% {
+  # foreach(k=1:12,.packages = "raster",.combine="stack") %do% {
+      prediction_stack$month<-k
+      rs<-raster::predict(object=prediction_stack,model=model_object,fun=predfun, const=(data.frame(Gear_Type=0)),progress="text")
+      # rs=mask(x=rs,mask=zero_four_meters,updatevalue=0)
+      species_month=paste(model_version,"_",year[i],"_",k,sep="")
+      names(rs)<-species_month
+      writeRaster(rs, filename=paste("model_output/", species_month, ".tif", sep=""), format="GTiff",overwrite=TRUE,sep="")
+      return(rs)
+  }
+}
+
+
+year=c(2017,2018,2019,2020)
+
+spotted_seatrout_monthly_rasters=foreach(i=1:length(year),.packages = "raster",.combine = "stack") %do% {
+  model_version<-c("spotted_seatrout")
+  model_object<-get(model_version)
+  dat<-as.data.frame(model_object$model)
+  # model_object_updated<-update(model_object,.~.-s(Gear_Type,bs="re"),data=dat)
+  prediction_stack<-rs_stack_study_region_inshore_grid
+  prediction_stack$year<-year[i]
+  foreach(k=1:12,.packages = "raster",.combine="stack") %do% {
+  # foreach(k=1:12,.packages = "raster",.combine="stack") %do% {
+      prediction_stack$month<-k
+      rs<-raster::predict(object=prediction_stack,model=model_object,fun=predfun, const=(data.frame(Gear_Type=0)),progress="text")
+      # rs=mask(x=rs,mask=zero_four_meters,updatevalue=0)
+      species_month=paste(model_version,"_",year[i],"_",k,sep="")
+      names(rs)<-species_month
+      writeRaster(rs, filename=paste("model_output/", species_month, ".tif", sep=""), format="GTiff",overwrite=TRUE,sep="")
+      return(rs)
+  }
+}
+
+
+
+year=c(2018)
+
+sheepshead_monthly_rasters=foreach(i=1:length(year),.packages = "raster",.combine = "stack") %do% {
+  model_version<-c("sheepshead")
+  model_object<-get(model_version)
+  dat<-as.data.frame(model_object$model)
+  # model_object_updated<-update(model_object,.~.-s(Gear_Type,bs="re"),data=dat)
+  prediction_stack<-rs_stack_study_region_inshore_grid
+  prediction_stack$year<-year[i]
+  foreach(k=12,.packages = "raster",.combine="stack") %do% {
+  # foreach(k=1:12,.packages = "raster",.combine="stack") %do% {
+      prediction_stack$month<-k
+      rs<-raster::predict(object=prediction_stack,model=model_object,fun=predfun, const=(data.frame(Gear_Type=0)),progress="text")
+      # rs=mask(x=rs,mask=zero_four_meters,updatevalue=0)
+      species_month=paste(model_version,"_",year[i],"_",k,sep="")
+      names(rs)<-species_month
+      writeRaster(rs, filename=paste("model_output/", species_month, ".tif", sep=""), format="GTiff",overwrite=TRUE,sep="")
+      return(rs)
+  }
+}
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Predictions_February2021.RData")
+```
+
+#checking that the predictions match
+```{r}
+
+data_shp<-data%>%
+  filter(month==5 & year==2017)
+coordinates(data_shp)<- ~Longitude+Latitude
+
+draw(sheepshead)
+
+test_rs<-raster("model_output/nursery_monthly/sheepshead_2017_5")
+
+test_rs[test_rs<=0.01]<-0
+
+sheepshead_2017_5=raster::extract(x = test_rs,y=data_shp)
+
+data_shp_extracted_df=cbind(data_shp,as.data.frame(sheepshead_2017_5))
+data_shp_extracted_df=as.data.frame(data_shp_extracted_df)
+
+
+data_shp_extracted_df$test_predict_reponse=mgcv::predict.gam(object = sheepshead, newdata=data_shp_extracted_df, type="response", se.fit=FALSE)
+
+
+data_shp_extracted_df$test_predict_link=mgcv::predict.gam(object = sheepshead, newdata=data_shp_extracted_df, type="link", se.fit=FALSE)
+data_shp_extracted_df
+
+```

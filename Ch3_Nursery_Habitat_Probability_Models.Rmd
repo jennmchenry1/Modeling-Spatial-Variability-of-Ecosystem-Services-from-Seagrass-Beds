@@ -1,0 +1,1021 @@
+---
+title: "Exploring_Probability_Based_Nursery_Models"
+author: "Jenn_McHenry"
+date: "5/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+#libraries needed
+library(gratia)
+library(utils)
+library(mgcv)
+library(pROC)
+library(tools)
+library(dplyr)
+library(ggplot2)
+library(doBy)
+library(dplyr)
+library(tidyr)
+library(plyr)
+# Use dredge to test sub-models
+library(MuMIn)
+library(raster)
+library(FSSgam)
+library(nnet)
+# Set the primary working directories
+
+#this formula converts values from log odds to probability 
+odds_to_prob=function(x){
+        prob<-exp(x)/(1+exp(x))
+        return(prob)
+}
+
+```
+
+
+#To Do List:
+1. Plot the size distribution of different species in seagrass beds vs non seagrass beds to see what species actually use seagrasses and when. 
+2. Could do a statistical test first to see which species have different life stages. 
+3. Identify a size cutoff and split up the data into juveniles and adults.
+4. Run individual models to find best predictors of nursery habitat use.
+5. Cross validate each model to determine how transferable it is.
+6. Run model prediction to examine spatial patterns. 
+
+
+# loading data
+```{r}
+
+FIM_Final_Nursery_Species=read.csv(file="data/FIM_Final_Juvenile_NurserySpecies_1997_2017.csv")
+
+
+names(FIM_Final_Nursery_Species)
+# [60] "Atlantic Croaker"
+#      "Black.Sea.Bass"             
+# [61] "Common.Snook"   
+#      "Crevalle.Jack"
+# [62] "Florida.Stone.Crab" 
+# [63] "Gray.Snapper"               
+# [64] "Lane.Snapper"               
+# [65] "Pink.Shrimp"                
+# [66] "Red.Drum"  
+# [67] "Sheepshead"                 
+# [68] "Spiny.Lobster"              
+# [69] "Spotted.Seatrout" 
+#      "White.Grunt"
+
+FIM_reference=FIM_Final_Nursery_Species[c(1:56)]
+FIM_spp=FIM_Final_Nursery_Species[c(57:70)]
+FIM_spp[is.na(FIM_spp)==TRUE]<-0
+
+FIM_Final_Nursery_Species=cbind(FIM_reference,FIM_spp)
+summary(FIM_Final_Nursery_Species)
+
+levels(as.factor(FIM_Final_Nursery_Species$Gear))
+
+FIM_Final_Nursery_Species=FIM_Final_Nursery_Species%>%
+  mutate(Gear_Type=ifelse(Gear_Type=="SmallSeines","SmallSeine",Gear_Type))%>%
+  filter(is.na(Gear_Type)==FALSE)
+
+```
+
+
+#Run GAMs for all possible nursery species 
+```{r}
+data=FIM_Final_Nursery_Species%>%
+  dplyr::select(Reference,Gear_Type,
+                Atlantic.Croaker,
+                # Black.Drum,
+                Black.Sea.Bass,
+                Common.Snook,
+                Crevalle.Jack,
+                Florida.Stone.Crab,
+                Gray.Snapper,
+                # Gag,
+                Lane.Snapper,
+                Pink.Shrimp,
+                Red.Drum,
+                # Red.Snapper,
+                Sheepshead,
+                Spotted.Seatrout,
+                Spiny.Lobster,
+                White.Grunt,
+                Longitude,Latitude,month,year,
+                BottomVegCover, SAV_Hill0, TH_Cover, SY_Cover, HA_Cover, 
+                Depth, Temperature.Mean, Temperature.Range, Temperature.Min, Salinity.Min, Dissolved.oxygen.Min, Primary.productivity.Max, Current.Velocity.Mean, Current.Velocity.Range, Mud, Sand, Rocks, ST_Mangroves, ST_Oysters, Dist_To_Shore,Dist_To_River)%>%
+    mutate(Dist_To_River=ifelse(Dist_To_River>=10,10,Dist_To_River),Mud=as.factor(Mud), Sand=as.factor(Sand), Rocks=as.factor(Rocks), ST_Mangroves=as.factor(ST_Mangroves), ST_Oysters=as.factor(ST_Oysters))%>%
+  mutate(
+    # Black.Drum.PA=ifelse(Black.Drum>0,1,Black.Drum),
+        Atlantic.Croaker.PA=ifelse(Atlantic.Croaker>0,1,Atlantic.Croaker),
+         Black.Sea.Bass.PA=ifelse(Black.Sea.Bass>0,1,Black.Sea.Bass),
+         Common.Snook.PA=ifelse(Common.Snook>0,1,Common.Snook),
+        Crevalle.Jack.PA=ifelse(Crevalle.Jack>0,1,Crevalle.Jack),
+         Florida.Stone.Crab.PA=ifelse(Florida.Stone.Crab>0,1,Florida.Stone.Crab),
+         Gray.Snapper.PA=ifelse(Gray.Snapper>0,1,Gray.Snapper),
+         Lane.Snapper.PA=ifelse(Lane.Snapper>0,1,Lane.Snapper),
+         Pink.Shrimp.PA=ifelse(Pink.Shrimp>0,1,Pink.Shrimp),
+         Red.Drum.PA=ifelse(Red.Drum>0,1,Red.Drum),
+         Sheepshead.PA=ifelse(Sheepshead>0,1,Sheepshead),
+         Spotted.Seatrout.PA=ifelse(Spotted.Seatrout>0,1,Spotted.Seatrout),
+         Spiny.Lobster.PA=ifelse(Spiny.Lobster>0,1,Spiny.Lobster),
+        White.Grunt.PA=ifelse(White.Grunt>0,1,White.Grunt))%>%
+  mutate(TH_PA=as.factor(ifelse(TH_Cover>0,1,TH_Cover)),SY_PA=as.factor(ifelse(SY_Cover>0,1,SY_Cover)), HA_PA=as.factor(ifelse(HA_Cover>0,1,HA_Cover)),Seagrass_PA=as.factor(ifelse(BottomVegCover>0,1,0)))
+
+summary(data)
+
+data=data[complete.cases(data),]
+# data=unique(data)
+# 
+# data<-distinct(data, Longitude,Latitude, .keep_all= TRUE)
+
+
+data%>%
+  dplyr::group_by(Gear_Type)%>%
+  dplyr::summarize(
+            # BD=sum(Black.Drum.PA>0),
+            AC=sum(Atlantic.Croaker.PA>0),
+            BSB=sum(Black.Sea.Bass.PA>0),
+            FSC=sum(Florida.Stone.Crab.PA>0),
+            CS=sum(Common.Snook.PA>0),
+            CJ=sum(Crevalle.Jack.PA>0),
+            # G=sum(Gag.PA>0),
+            GS=sum(Gray.Snapper.PA>0),
+            LS=sum(Lane.Snapper.PA>0),
+            PS=sum(Pink.Shrimp.PA>0),
+            RD=sum(Red.Drum.PA>0),
+            # RS=sum(Red.Snapper.PA>0),
+            SH=sum(Sheepshead.PA>0),
+            SST=sum(Spotted.Seatrout.PA>0),
+            SL=sum(Spiny.Lobster.PA>0),
+            WG=sum(White.Grunt.PA>0))
+
+
+write.csv(data,file="data/FIM_Final_NurserySpecies_1997_2017_wideform_meancovaraites_QAQC.csv")
+
+```
+
+
+#Nursery Habitat Presence Absence  Model Selection
+```{r}
+
+data=read.csv(file="data/FIM_Final_NurserySpecies_1997_2017_wideform_meancovaraites_QAQC.csv")
+
+
+levels(as.factor(data$Gear_Type))
+
+data=data%>%
+  filter(Gear_Type=="SmallSeine" | Gear_Type=="OtterTrawl")
+
+#distribution 
+data%>%
+  dplyr::group_by(Gear_Type)%>%
+ dplyr::summarize(
+            # BD=sum(Black.Drum.PA>0),
+            AC=sum(Atlantic.Croaker.PA>0),
+            # BSB=sum(Black.Sea.Bass.PA>0),
+            # FSC=sum(Florida.Stone.Crab.PA>0),
+            # CS=sum(Common.Snook.PA>0),
+            CJ=sum(Crevalle.Jack.PA>0),
+            # G=sum(Gag.PA>0),
+            GS=sum(Gray.Snapper.PA>0),
+            LS=sum(Lane.Snapper.PA>0),
+            PS=sum(Pink.Shrimp.PA>0),
+            RD=sum(Red.Drum.PA>0),
+            # RS=sum(Red.Snapper.PA>0),
+            SH=sum(Sheepshead.PA>0),
+            SST=sum(Spotted.Seatrout.PA>0),
+            # SL=sum(Spiny.Lobster.PA>0),
+            WG=sum(White.Grunt.PA>0))
+
+# `summarise()` ungrouping output (override with `.groups` argument)
+# # A tibble: 2 x 10
+#   Gear_Type     AC    CJ    GS    LS    PS    RD    SH   SST    WG
+#   <fct>      <int> <int> <int> <int> <int> <int> <int> <int> <int>
+# 1 OtterTrawl   169     2    43   223    14    32    29   125    41
+# 2 SmallSeine    16    31   370   156   267   846   246   882    45
+# > 
+
+#Model Selection Thinned 0.08km fitting data
+##################################################################################
+cat.preds=c("Sand","Mud","Rocks","Seagrass_PA","TH_PA","SY_PA","HA_PA","ST_Mangroves","ST_Oysters")
+null.vars=c("Gear_Type")
+cont.preds=c("Depth","Dist_To_Shore","Dist_To_River","Primary.productivity.Max","Dissolved.oxygen.Min","Temperature.Min","Salinity.Min","BottomVegCover","Latitude")
+
+
+data=data%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Seagrass_PA=as.factor(Seagrass_PA),ST_Mangroves=as.factor(ST_Mangroves),ST_Oysters=as.factor(ST_Oysters),Mud=as.factor(Mud),Sand=as.factor(Sand),Rocks=as.factor(Rocks),Gear_Type=as.factor(Gear_Type))
+
+
+seine_nursery_data=data%>%
+  filter(Gear_Type=="SmallSeine")
+
+ottter_nursery_data=data%>%
+  filter(Gear_Type=="OtterTrawl")
+#USEFUL NURSERY MODELS::
+
+######################################################################
+
+#Pink Shrimp  BASE MODELS ##################
+
+#Probability 
+Pink_Shrimp_PA_gam_base=mgcv::gam(Pink.Shrimp.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(Gear_Type,bs="re"),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+summary(Pink_Shrimp_PA_gam_base)
+
+draw(Pink_Shrimp_PA_gam_base)
+
+model.set.PinkShrimp.PA=generate.model.set(use.dat=data, test.fit=Pink_Shrimp_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.3,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+# save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+
+out.list.PinkShrimp.PA=fit.model.set(model.set.PinkShrimp.PA)
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.PinkShrimp.PA)
+out.list.PinkShrimp.PA$failed.models
+length(out.list.PinkShrimp.PA$success.models)
+mod.table.PinkShrimp.PA=out.list.PinkShrimp.PA$mod.data.out
+mod.table.PinkShrimp.PA=mod.table.PinkShrimp.PA[order(mod.table.PinkShrimp.PA$AICc),]
+head(mod.table.PinkShrimp.PA)
+
+Pink_Shrimp_PA_ModelTable_SpaceTime=mod.table.PinkShrimp.PA
+
+write.csv(Pink_Shrimp_PA_ModelTable_SpaceTime,file ="model_output/PinkShrimp_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Pink_Shrimp_PA_ModelTable_SpaceTime$predictor.correlations
+
+Pink.SHrimp.all.less.2AICc=Pink_Shrimp_PA_ModelTable_SpaceTime[which(Pink_Shrimp_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Pink.SHrimp.all.less.2AICc$formula
+
+#Pink Shrimp BEST MODEL #############
+Pink_Shrimp_PA_gam_Best=mgcv::gam(Pink.Shrimp.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + 
+                                    s(year,bs="ts",k=4)+
+                                    s(Dist_To_Shore, by=HA_PA, bs="ts", k=4)+ te(Dissolved.oxygen.Min, Temperature.Min,bs="ts",k=3)+
+                                  HA_PA+
+                                  s(Gear_Type,bs="re"),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+summary(Pink_Shrimp_PA_gam_Best)
+AIC(Pink_Shrimp_PA_gam_Best)
+
+PinkShrimp_PA_train_predict<-cbind(as.data.frame(data$Pink.Shrimp),as.data.frame(predict.gam(object=Pink_Shrimp_PA_gam_Best,newdata=Pink_Shrimp_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(PinkShrimp_PA_train_predict)[1]<-c("Abundance")
+
+cor(PinkShrimp_PA_train_predict$Abundance,PinkShrimp_PA_train_predict$fit)
+
+
+PinkShrimp_full_train_AUC=SDMTools::auc(as.integer(Pink_Shrimp_PA_gam_Best$model$Pink.Shrimp.PA), as.numeric(PinkShrimp_PA_train_predict$fit))
+
+PinkShrimp_full_train_AUC
+
+AIC(Pink_Shrimp_PA_gam_Best)
+
+saveRDS(Pink_Shrimp_PA_gam_Best,file="model_versions/Pink_Shrimp_binomial_gam.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Pink_Shrimp_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+draw(Pink_Shrimp_PA_gam_Best)
+#Gray snapper BASE MODEL #############
+
+#Probability 
+Grey_Snapper_PA_gam_base=mgcv::gam(Gray.Snapper.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(Gear_Type,bs="re"),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Grey_Snapper_PA_gam_base)
+draw(Grey_Snapper_PA_gam_base)
+
+model.set.GraySnapper.PA=generate.model.set(use.dat=data, test.fit=Grey_Snapper_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+out.list.GraySnapper.PA=fit.model.set(model.set.GraySnapper.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.GraySnapper.PA)
+out.list.GraySnapper.PA$failed.models
+length(out.list.GraySnapper.PA$success.models)
+mod.table.GraySnapper.PA=out.list.GraySnapper.PA$mod.data.out
+mod.table.GraySnapper.PA=mod.table.GraySnapper.PA[order(mod.table.GraySnapper.PA$AICc),]
+head(mod.table.GraySnapper.PA)
+
+Gray_Snapper_PA_ModelTable_SpaceTime=mod.table.GraySnapper.PA
+
+write.csv(Gray_Snapper_PA_ModelTable_SpaceTime,file ="model_output/Gray_Snapper_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Gray_Snapper_PA_ModelTable_SpaceTime$predictor.correlations
+
+Gray.Snapper.all.less.2AICc=Gray_Snapper_PA_ModelTable_SpaceTime[which(Gray_Snapper_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Gray.Snapper.all.less.2AICc$formula
+
+
+#Gray Snapper BASE MODEL ###########333
+Gray_Snapper_PA_gam_Best=mgcv::gam(Gray.Snapper.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + 
+                                     # s(year,bs="ts",k=4)+
+                                     s(Gear_Type,bs="re") +
+                                     te(Dist_To_River, BottomVegCover,bs="ts",k=4)+
+                                    te(Dissolved.oxygen.Min, Temperature.Min,k=4, bs="ts"),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Gray_Snapper_PA_gam_Best)
+
+
+par(mfrow=c(2,3));plot.gam(Gray_Snapper_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+
+GraySnapper_PA_train_predict<-cbind(as.data.frame(data$Gray.Snapper),as.data.frame(predict.gam(object=Gray_Snapper_PA_gam_Best,newdata=Gray_Snapper_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(GraySnapper_PA_train_predict)[1]<-c("Abundance")
+
+cor(GraySnapper_PA_train_predict$Abundance,GraySnapper_PA_train_predict$fit)
+
+GraySnapper_full_train_AUC=SDMTools::auc(as.integer(Gray_Snapper_PA_gam_Best$model$Gray.Snapper.PA), as.numeric(GraySnapper_PA_train_predict$fit))
+GraySnapper_full_train_AUC
+
+saveRDS(Gray_Snapper_PA_gam_Best,file="model_versions/Gray_Snapper_binomial_gam.rds")
+
+draw(Gray_Snapper_PA_gam_Best)
+
+
+#Lane snapper BASE MODEL ########
+#Probability 
+Lane_Snapper_PA_gam_base=mgcv::gam(Lane.Snapper.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +s(Gear_Type,bs="re"),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+summary(Lane_Snapper_PA_gam_base)
+draw(Lane_Snapper_PA_gam_base)
+
+model.set.LaneSnapper.PA=generate.model.set(use.dat=data, test.fit=Lane_Snapper_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+
+out.list.LaneSnapper.PA=fit.model.set(model.set.LaneSnapper.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.LaneSnapper.PA)
+out.list.LaneSnapper.PA$failed.models
+length(out.list.LaneSnapper.PA$success.models)
+mod.table.LaneSnapper.PA=out.list.LaneSnapper.PA$mod.data.out
+mod.table.LaneSnapper.PA=mod.table.LaneSnapper.PA[order(mod.table.LaneSnapper.PA$AICc),]
+head(mod.table.LaneSnapper.PA)
+
+Lane_Snapper_PA_ModelTable_SpaceTime=mod.table.LaneSnapper.PA
+
+write.csv(Lane_Snapper_PA_ModelTable_SpaceTime,file ="model_output/Lane_Snapper_PA_ModelTable.csv")
+
+
+# check the predictor correlation matrix
+Lane_Snapper_PA_ModelTable_SpaceTime$predictor.correlations
+
+Lane.Snapper.all.less.2AICc=Lane_Snapper_PA_ModelTable_SpaceTime[which(Lane_Snapper_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Lane.Snapper.all.less.2AICc$formula
+
+
+#Lane Snapper BEST MODEL##############
+Lane_Snapper_PA_gam_Best=mgcv::gam(Lane.Snapper.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +
+                                     # s(year,bs="ts",k=4)+
+                                     s(Gear_Type,bs="re") +
+                             te(Dissolved.oxygen.Min, Temperature.Min,k=4, bs="ts") +
+                               te(Depth,BottomVegCover,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Lane_Snapper_PA_gam_Best)
+
+AIC(Lane_Snapper_PA_gam_Best)
+
+LaneSnapper_PA_train_predict<-cbind(as.data.frame(data$Lane.Snapper),as.data.frame(predict.gam(object=Lane_Snapper_PA_gam_Best,newdata=Lane_Snapper_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(LaneSnapper_PA_train_predict)[1]<-c("Abundance")
+
+cor(LaneSnapper_PA_train_predict$Abundance,LaneSnapper_PA_train_predict$fit)
+
+LaneSnapper_full_train_AUC=SDMTools::auc(as.integer(Lane_Snapper_PA_gam_Best$model$Lane.Snapper.PA), as.numeric(LaneSnapper_PA_train_predict$fit))
+LaneSnapper_full_train_AUC
+
+saveRDS(Lane_Snapper_PA_gam_Best,file="model_versions/Lane_Snapper_binomial_gam.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Lane_Snapper_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+draw(Lane_Snapper_PA_gam_Best)
+
+
+
+
+#Sheepshead BASE MODEL ########
+
+#Probability
+Sheepshead_PA_gam_base=mgcv::gam(Sheepshead.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +s(Gear_Type,bs="re"),
+             family=binomial(),
+             data,
+             method="ML")
+
+summary(Sheepshead_PA_gam_base)
+
+model.set.Sheepshead.PA=generate.model.set(use.dat=data, test.fit=Sheepshead_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+
+out.list.Sheepshead.PA=fit.model.set(model.set.Sheepshead.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.Sheepshead.PA)
+out.list.Sheepshead.PA$failed.models
+length(out.list.Sheepshead.PA$success.models)
+mod.table.Sheepshead.PA=out.list.Sheepshead.PA$mod.data.out
+mod.table.Sheepshead.PA=mod.table.Sheepshead.PA[order(mod.table.Sheepshead.PA$AICc),]
+head(mod.table.Sheepshead.PA)
+
+Sheepshead_PA_ModelTable_SpaceTime=mod.table.Sheepshead.PA
+
+write.csv(Sheepshead_PA_ModelTable_SpaceTime,file ="model_output/Sheepshead_PA_ModelTable.csv")
+
+
+# check the predictor correlation matrix
+Sheepshead_PA_ModelTable_SpaceTime$predictor.correlations
+
+Sheepshead.all.less.2AICc=Sheepshead_PA_ModelTable_SpaceTime[which(Sheepshead_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Sheepshead.all.less.2AICc$formula
+
+# [1] "s(Depth, k = 4, bs = \"ts\") + s(Latitude, k = 4, bs = \"ts\") + s(BottomVegCover, by = Mud, k = 4, bs = \"ts\") + Mud"
+# [2] "s(BottomVegCover, k = 4, bs = \"ts\") + te(Depth, Latitude, k = 4, bs = c(\"ts\", \"ts\")) + Mud"                      
+# [3] "s(BottomVegCover, by = Mud, k = 4, bs = \"ts\") + te(Depth, Latitude, k = 4, bs = c(\"ts\", \"ts\")) + Mud"            
+# [4] "s(Latitude, k = 4, bs = \"ts\") + te(Dist_To_Shore, BottomVegCover, k = 4, bs = c(\"ts\", \"ts\")) + Mud" 
+
+
+#Sheepshead BEST MODEL##############
+
+Sheepshead_PA_gam_Best=mgcv::gam(Sheepshead.PA ~
+                                   # s(Longitude, Latitude, bs='gp',k=-1, m=2) +
+                                   s(year,bs="ts",k=4)+
+                                   s(month,bs="cc",k=4) +
+                                     s(Gear_Type,bs="re",k=4)+
+                                 s(Latitude,bs="ts",k=4)+
+                                   te(BottomVegCover,Dist_To_Shore,bs="ts",k=4) +
+                                   # s(BottomVegCover,bs="ts",k=4) +
+                                   Mud,
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Sheepshead_PA_gam_Best)
+
+AIC(Sheepshead_PA_gam_Best)
+
+Sheepshead_PA_train_predict<-cbind(as.data.frame(data$Sheepshead),as.data.frame(predict.gam(object=Sheepshead_PA_gam_Best,newdata=Sheepshead_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(Sheepshead_PA_train_predict)[1]<-c("Abundance")
+
+cor(Sheepshead_PA_train_predict$Abundance,Sheepshead_PA_train_predict$fit)
+
+Sheepshead_full_train_AUC=SDMTools::auc(as.integer(Sheepshead_PA_gam_Best$model$Sheepshead.PA), as.numeric(Sheepshead_PA_train_predict$fit))
+Sheepshead_full_train_AUC
+
+saveRDS(Sheepshead_PA_gam_Best,file="model_versions/Sheepshead_binomial_gam.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Sheepshead_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+draw(Sheepshead_PA_gam_Best)
+
+
+
+#Probability
+WhiteGrunt_PA_gam_base=mgcv::gam(White.Grunt.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4), 
+                                 # +s(Gear_Type,bs="re"),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+summary(WhiteGrunt_PA_gam_base)
+
+model.set.WhiteGrunt.PA=generate.model.set(use.dat=data, test.fit=WhiteGrunt_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+
+out.list.WhiteGrunt.PA=fit.model.set(model.set.WhiteGrunt.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.WhiteGrunt.PA)
+out.list.WhiteGrunt.PA$failed.models
+length(out.list.WhiteGrunt.PA$success.models)
+mod.table.WhiteGrunt.PA=out.list.WhiteGrunt.PA$mod.data.out
+mod.table.WhiteGrunt.PA=mod.table.WhiteGrunt.PA[order(mod.table.WhiteGrunt.PA$AICc),]
+head(mod.table.Sheepshead.PA)
+
+WhiteGrunt_PA_ModelTable_SpaceTime=mod.table.WhiteGrunt.PA
+
+write.csv(WhiteGrunt_PA_ModelTable_SpaceTime,file ="model_output/WhiteGrunt_PA_ModelTable.csv")
+
+
+# check the predictor correlation matrix
+WhiteGrunt_PA_ModelTable_SpaceTime$predictor.correlations
+
+WhiteGrunt.all.less.2AICc=WhiteGrunt_PA_ModelTable_SpaceTime[which(WhiteGrunt_PA_ModelTable_SpaceTime$delta.AICc<2),]
+WhiteGrunt.all.less.2AICc$formula
+
+# 1] "s(BottomVegCover, k = 4, bs = \"ts\") + s(Dissolved.oxygen.Min, k = 4, bs = \"ts\") + te(Depth, Temperature.Min, k = 4, bs = c(\"ts\", \"ts\"))"        
+# [2] "s(Dist_To_Shore, k = 4, bs = \"ts\") + s(Temperature.Min, k = 4, bs = \"ts\") + te(Dissolved.oxygen.Min, BottomVegCover, k = 4, bs = c(\"ts\", \"ts\"))"
+# [3] "s(Dist_To_Shore, k = 4, bs = \"ts\") + te(Primary.productivity.Max, BottomVegCover, k = 4, bs = c(\"ts\", \"ts\")) + Sand" 
+
+#White Grunt BEST MODEL##############
+
+WhiteGrunt_PA_gam_Best=mgcv::gam(White.Grunt.PA ~ 
+                                   s(Longitude, Latitude, bs = "gp", k = -1, m = 2) +
+                                   # s(year,bs="ts",k=4)+
+                                   s(month, bs = "cc", k = 4)+ 
+                                   s(Dist_To_Shore,bs="ts",k=4)+
+                                   te(Primary.productivity.Max, BottomVegCover,bs="ts",k=4) ,
+    
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(WhiteGrunt_PA_gam_Best)
+
+AIC(WhiteGrunt_PA_gam_Best)
+
+WhiteGrunt_PA_train_predict<-cbind(as.data.frame(data$White.Grunt),as.data.frame(predict.gam(object=WhiteGrunt_PA_gam_Best,newdata=WhiteGrunt_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(WhiteGrunt_PA_train_predict)[1]<-c("Abundance")
+
+cor(WhiteGrunt_PA_train_predict$Abundance,WhiteGrunt_PA_train_predict$fit)
+
+WhiteGrunt_full_train_AUC=SDMTools::auc(as.integer(WhiteGrunt_PA_gam_Best$model$White.Grunt.PA), as.numeric(WhiteGrunt_PA_train_predict$fit))
+WhiteGrunt_full_train_AUC
+
+
+saveRDS(WhiteGrunt_PA_gam_Best,file="model_versions/WhiteGrunt_binomial_gam.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(WhiteGrunt_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+draw(WhiteGrunt_PA_gam_Best)
+
+
+#SPOTTED SEATROUT ---  BASE MODELS
+#Probability 
+Spotted_Seatrout_PA_gam_base=mgcv::gam(Spotted.Seatrout.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +s(Gear_Type,bs='re'),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Spotted_Seatrout_PA_gam_base)
+
+
+model.set.SpottedSeatrout.PA=generate.model.set(use.dat=data, test.fit=Spotted_Seatrout_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(Gear_Type,bs='re')",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+
+model.set.SpottedSeatrout.PA$n.mods
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+# trying to run without any registerDoParallel commands for 30 cores.This didnt work.....
+# trying to run without any registerDoParallel commands for 20 cores. This didnt work either........
+# trying to run without any registerDoParallel commands for 30 cores. Trying again after reloading the workspace for just after I ran the seagrsss cover models selection.
+
+out.list.SpottedSeatrout.PA=fit.model.set(model.set.SpottedSeatrout.PA)
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.SpottedSeatrout.PA)
+out.list.SpottedSeatrout.PA$failed.models
+length(out.list.SpottedSeatrout.PA$success.models)
+mod.table.SpottedSeatrout.PA=out.list.SpottedSeatrout.PA$mod.data.out
+mod.table.SpottedSeatrout.PA=mod.table.SpottedSeatrout.PA[order(mod.table.SpottedSeatrout.PA$AICc),]
+head(mod.table.SpottedSeatrout.PA)
+
+Spotted_Seatrout_PA_ModelTable_SpaceTime=mod.table.SpottedSeatrout.PA
+
+write.csv(Spotted_Seatrout_PA_ModelTable_SpaceTime,file ="model_output/SpottedSeatrout_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Spotted_Seatrout_PA_ModelTable_SpaceTime$predictor.correlations
+
+Spotted_Seatrout_PA_2AICc=Spotted_Seatrout_PA_ModelTable_SpaceTime[which(Spotted_Seatrout_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Spotted_Seatrout_PA_2AICc$formula
+
+
+# #Spotted Seatrout PA Best Model #########
+Spotted_Seatrout_PA_gam_Best=mgcv::gam(Spotted.Seatrout.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + 
+                                         # s(Gear_Type,bs='re')+
+                                         s(year,bs="ts",k=4)+
+                                         te(Depth, BottomVegCover,bs="ts",k=4)+
+                                         te(Dist_To_Shore, Dissolved.oxygen.Min,bs="ts",k=4),
+                                         # TH_PA,
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Spotted_Seatrout_PA_gam_Best)
+AIC(Spotted_Seatrout_PA_gam_Best)
+
+
+SpottedSeatrout_PA_train_predict<-cbind(as.data.frame(data$Spotted.Seatrout),as.data.frame(predict.gam(object=Spotted_Seatrout_PA_gam_Best,newdata=Spotted_Seatrout_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(SpottedSeatrout_PA_train_predict)[1]<-c("Abundance")
+
+cor(SpottedSeatrout_PA_train_predict$Abundance,SpottedSeatrout_PA_train_predict$fit)
+  
+SpottedSeatrout_full_train_AUC=SDMTools::auc(as.integer(Spotted_Seatrout_PA_gam_Best$model$Spotted.Seatrout.PA), as.numeric(SpottedSeatrout_PA_train_predict$fit))
+SpottedSeatrout_full_train_AUC
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Spotted_Seatrout_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE,scale = 0)
+
+draw(Spotted_Seatrout_PA_gam_Best)
+
+saveRDS(Spotted_Seatrout_PA_gam_Best,file="model_versions/Spotted_Seatrout_binomial_gam.rds")
+
+## NOT NURSREY MODEL SPECIES
+#####################################################################################33
+
+
+#Atlantic Croaker ---  BASE MODELS
+#Probability 
+Atlantic_Croaker_PA_gam_base=mgcv::gam(Atlantic.Croaker.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +s(Gear_Type,bs='re'),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Atlantic_Croaker_PA_gam_base)
+
+
+model.set.AtlanticCroaker.PA=generate.model.set(use.dat=data, test.fit=Atlantic_Croaker_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(Gear_Type,bs='re')",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+
+model.set.AtlanticCroaker.PA$n.mods
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+# trying to run without any registerDoParallel commands for 30 cores.This didnt work.....
+# trying to run without any registerDoParallel commands for 20 cores. This didnt work either........
+# trying to run without any registerDoParallel commands for 30 cores. Trying again after reloading the workspace for just after I ran the seagrsss cover models selection.
+
+out.list.AtlanticCroaker.PA=fit.model.set(model.set.AtlanticCroaker.PA)
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.AtlanticCroaker.PA)
+out.list.AtlanticCroaker.PA$failed.models
+length(out.list.AtlanticCroaker.PA$success.models)
+mod.table.AtlanticCroaker.PA=out.list.AtlanticCroaker.PA$mod.data.out
+mod.table.AtlanticCroaker.PA=mod.table.AtlanticCroaker.PA[order(mod.table.AtlanticCroaker.PA$AICc),]
+head(mod.table.AtlanticCroaker.PA)
+
+Atlantic_Croaker_PA_ModelTable_SpaceTime=mod.table.AtlanticCroaker.PA
+
+write.csv(Atlantic_Croaker_PA_ModelTable_SpaceTime,file ="model_output/AtlanticCroaker_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Atlantic_Croaker_PA_ModelTable_SpaceTime$predictor.correlations
+
+Atlantic.Croaker.PA_2AICc=Atlantic_Croaker_PA_ModelTable_SpaceTime[which(Atlantic_Croaker_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Atlantic.Croaker.PA_2AICc$formula
+
+
+# [1] "s(BottomVegCover, k = 4, bs = \"ts\") + s(Dissolved.oxygen.Min, k = 4, bs = \"ts\") + te(Depth, Dist_To_Shore, k = 4, bs = c(\"ts\", \"ts\"))"
+# [2] "te(Depth, Dist_To_Shore, k = 4, bs = c(\"ts\", \"ts\")) + te(Dissolved.oxygen.Min, BottomVegCover, k = 4, bs = c(\"ts\", \"ts\"))" 
+
+
+# #Spotted Seatrout PA Best Model #########
+Atlantic_Croaker_PA_gam_Best=mgcv::gam(Atlantic.Croaker.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + 
+                                         # s(year,bs="ts",k=4)+
+                                         s(Gear_Type,bs='re')+
+                                         te(BottomVegCover, Dissolved.oxygen.Min,bs="ts",k=4)+
+                                         te(Depth, Dist_To_Shore,bs="ts",k=4),
+
+                                         # TH_PA,
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Atlantic_Croaker_PA_gam_Best)
+AIC(Atlantic_Croaker_PA_gam_Best)
+
+AtlanticCroaker_PA_train_predict<-cbind(as.data.frame(data$Atlantic.Croaker),as.data.frame(predict.gam(object=Atlantic_Croaker_PA_gam_Best,newdata=Atlantic_Croaker_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(AtlanticCroaker_PA_train_predict)[1]<-c("Abundance")
+
+cor(AtlanticCroaker_PA_train_predict$Abundance,AtlanticCroaker_PA_train_predict$fit)
+  
+AtlanticCroaker_full_train_AUC=SDMTools::auc(as.integer(Atlantic_Croaker_PA_gam_Best$model$Atlantic.Croaker.PA), as.numeric(AtlanticCroaker_PA_train_predict$fit))
+AtlanticCroaker_full_train_AUC
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Atlantic_Croaker_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE,scale = 0)
+
+draw(Atlantic_Croaker_PA_gam_Best)
+
+saveRDS(Atlantic_Croaker_PA_gam_Best,file="model_versions/Atlantic_Croaker_binomial_gam.rds")
+
+
+
+#Probability 
+Red_Drum_PA_gam_base=mgcv::gam(Red.Drum.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +s(Gear_Type,bs="re"),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Red_Drum_PA_gam_base)
+
+
+model.set.RedDrum.PA=generate.model.set(use.dat=data, test.fit=Red_Drum_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          # non.linear.correlations=TRUE,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+out.list.RedDrum.PA=fit.model.set(model.set.RedDrum.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.RedDrum.PA)
+out.list.RedDrum.PA$failed.models
+length(out.list.RedDrum.PA$success.models)
+mod.table.RedDrum.PA=out.list.RedDrum.PA$mod.data.out
+mod.table.RedDrum.PA=mod.table.RedDrum.PA[order(mod.table.RedDrum.PA$AICc),]
+head(mod.table.RedDrum.PA)
+
+Red_Drum_PA_ModelTable_SpaceTime=mod.table.RedDrum.PA
+
+write.csv(Red_Drum_PA_ModelTable_SpaceTime,file ="model_output/RedDrum_PA_ModelTable.csv")
+
+
+# check the predictor correlation matrix
+Red_Drum_PA_ModelTable_SpaceTime$predictor.correlations
+
+Red.Drum.all.less.2AICc=Red_Drum_PA_ModelTable_SpaceTime[which(Red_Drum_PA_ModelTable_SpaceTime$delta.AICc<2),]
+Red.Drum.all.less.2AICc$formula
+
+# Redfish BEST MODEL ##################
+Red_Drum_PA_gam_Best=mgcv::gam(Red.Drum.PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4)+  
+                                 s(year,bs="ts",k=4) +
+                                 te(Depth, Temperature.Min, k=4, bs="ts") +
+                                 te(Dist_To_Shore, Dissolved.oxygen.Min, k=4, bs="ts") +
+                                + s(Gear_Type,bs="re"),
+                                          family=binomial(),
+             data=data,
+             method="ML")
+summary(Red_Drum_PA_gam_Best)
+
+RedDrum_PA_train_predict<-cbind(as.data.frame(data$Red.Drum),as.data.frame(predict.gam(object=Red_Drum_PA_gam_Best,newdata=Red_Drum_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(RedDrum_PA_train_predict)[1]<-c("Abundance")
+cor(RedDrum_PA_train_predict$Abundance,RedDrum_PA_train_predict$fit)
+  
+RedDrum_full_train_AUC=SDMTools::auc(as.integer(Red_Drum_PA_gam_Best$model$Red.Drum.PA), as.numeric(RedDrum_PA_train_predict$fit))
+
+RedDrum_full_train_AUC
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Red_Drum_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+saveRDS(Red_Drum_PA_gam_Best,file="model_versions/Red_Drum_binomial_gam.rds")
+
+
+
+#Probability
+CommonSnook_PA_gam_base=mgcv::gam(Common.Snook.PA ~ s(month,bs="cc",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+summary(CommonSnook_PA_gam_base)
+
+model.set.CommonSnook.PA=generate.model.set(use.dat=data, test.fit=CommonSnook_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_February2021.RData")
+
+
+
+out.list.CommonSnook.PA=fit.model.set(model.set.CommonSnook.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_February2021.RData")
+
+#examine the output
+names(out.list.CommonSnook.PA)
+out.list.CommonSnook.PA$failed.models
+length(out.list.CommonSnook.PA$success.models)
+mod.table.CommonSnook.PA=out.list.CommonSnook.PA$mod.data.out
+mod.table.CommonSnook.PA=mod.table.CommonSnook.PA[order(mod.table.CommonSnook.PA$AICc),]
+head(mod.table.CommonSnook.PA)
+
+CommonSnook_PA_ModelTable_SpaceTime=mod.table.CommonSnook.PA
+
+write.csv(CommonSnook_PA_ModelTable_SpaceTime,file ="model_output/CommonSnook_PA_ModelTable.csv")
+
+
+# check the predictor correlation matrix
+CommonSnook_PA_ModelTable_SpaceTime$predictor.correlations
+
+CommonSnook.all.less.2AICc=CommonSnook_PA_ModelTable_SpaceTime[which(CommonSnook_PA_ModelTable_SpaceTime$delta.AICc<2),]
+CommonSnook.all.less.2AICc$formula
+
+# [1] "s(Depth, k = 4, bs = \"ts\") + s(Dist_To_River, k = 4, bs = \"ts\") + s(Temperature.Min, by = TH_PA, k = 4, bs = \"ts\") + TH_PA"                
+# [2] "s(Primary.productivity.Max, by = ST_Oysters, k = 4, bs = \"ts\") + te(Dist_To_Shore, BottomVegCover, k = 4, bs = c(\"ts\", \"ts\")) + ST_Oysters"
+# [3] "s(Primary.productivity.Max, k = 4, bs = \"ts\") + te(Dist_To_Shore, BottomVegCover, k = 4, bs = c(\"ts\", \"ts\")) + ST_Oysters"    
+
+
+
+# BEST MODEL##############
+CommonSnook_PA_gam_Best=mgcv::gam(Common.Snook.PA ~
+                                   s(Longitude, Latitude, bs='gp',k=-1, m=2) +
+                                   s(month,bs="cc",k=4) +
+                                     # s(Gear_Type,bs="re",k=4)+
+                                    s(Depth,bs="ts",k=4)+ST_Oysters+ te(Dist_To_Shore,BottomVegCover,bs="ts",k=3),
+             family=binomial(),
+             data=seine_data,
+             method="ML")
+summary(CommonSnook_PA_gam_Best)
+
+AIC(CommonSnook_PA_gam_Best)
+
+CommonSnook_PA_train_predict<-cbind(as.data.frame(seine_data$Common.Snook),as.data.frame(predict.gam(object=CommonSnook_PA_gam_Best,newdata=CommonSnook_PA_gam_Best$model,type=c("response"),se.fit=TRUE)))
+names(CommonSnook_PA_train_predict)[1]<-c("Abundance")
+
+cor(CommonSnook_PA_train_predict$Abundance,CommonSnook_PA_train_predict$fit)
+
+CommonSnook_PA_train_predict=SDMTools::auc(as.integer(CommonSnook_PA_gam_Best$model$Common.Snook.PA), as.numeric(CommonSnook_PA_train_predict$fit))
+CommonSnook_PA_train_predict
+
+saveRDS(CommonSnook_PA_gam_Best,file="model_versions/CommonSnook_binomial_gam.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(CommonSnook_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+```
+
+#Publication figs
+```{r}
+library(gratia)
+
+draw(Black_Seabass_PA_gam_Best)
+
+draw(Pink_Shrimp_PA_gam_Best)
+
+draw(Gray_Snapper_PA_gam_Best)
+
+draw(Lane_Snapper_PA_gam_Best)
+
+draw(Sheepshead_PA_gam_Best)
+```
+
+
+#testing for spatial autocorrelation
+```{r}
+
+Black_Seabass_PA_gam_Best$call
+
+Black_Seabass_PA_gamm_Best=gamm(Black.Sea.Bass.PA ~ s(Longitude, Latitude, 
+    bs = "gp", k = -1, m = 2) +
+      s(month, bs = "cc", 
+    k = 4) + 
+      te(Primary.productivity.Max, BottomVegCover, bs = "ts", 
+    k = 4) +
+      Mud, 
+    family = binomial(), 
+    method = "ML",
+             data=data,
+             correlation=corExp(form=~Longitude+Latitude, nugget=TRUE))
+
+Pink_Shrimp_PA_gamm_Best=gamm(Pink.Shrimp.PA ~ s(Longitude, Latitude, bs = "gp", 
+    k = -1, m = 2) + s(month, bs = "cc", k = 4) + te(Dist_To_Shore, 
+    Primary.productivity.Max, bs = "ts", k = 3) + HA_PA + 
+    SY_PA,
+    family = binomial(), 
+    method = "ML",
+             data=data,
+             correlation=corExp(form=~Longitude+Latitude, nugget=TRUE))
+
+Gray_Snapper_PA_gamm_Best=gamm(Gray.Snapper.PA ~ s(Longitude, Latitude, 
+    bs = "gp", k = -1, m = 2) + s(month, bs = "cc", 
+    k = 4) + te(Dissolved.oxygen.Min, Temperature.Min, k = 4, 
+    bs = "ts") + Rocks + Seagrass_PA + s(Gear_Type, bs = "re"),
+    family = binomial(), 
+    method = "ML",
+             data=data,
+             correlation=corExp(form=~Longitude+Latitude, nugget=TRUE))
+
+Lane_Snapper_PA_gamm_Best=gamm(Lane.Snapper.PA ~ s(Longitude, Latitude, 
+    bs = "gp", k = -1, m = 2) + s(month, bs = "cc", 
+    k = 4) + s(Gear_Type, bs = "re", k = 4) + te(Temperature.Min, 
+    Dist_To_River, bs = "ts", k = 4) + te(Depth, Dissolved.oxygen.Min, 
+    bs = "ts", k = 4),
+    family = binomial(), 
+    method = "ML",
+             data=data,
+             correlation=corExp(form=~Longitude+Latitude, nugget=TRUE))
+
+Sheepshead_PA_gamm_Best=gamm( Sheepshead.PA ~ s(month, bs = "cc", 
+    k = 4) + te(Temperature.Min, Dissolved.oxygen.Min, bs = "ts", 
+    k = 4) + s(Depth, bs = "ts", k = 4) + Mud,
+    family = binomial(), 
+    method = "ML",
+             data=data,
+             correlation=corExp(form=~Longitude+Latitude, nugget=TRUE))
+
+
+```

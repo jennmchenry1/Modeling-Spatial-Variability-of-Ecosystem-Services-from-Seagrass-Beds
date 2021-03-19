@@ -1,0 +1,174 @@
+---
+title: "Making_Data_For_Jakob"
+author: "Jenn_McHenry"
+date: "1/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/jennm/Dropbox/LABWORK")
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(plyr)
+library(raster)
+library(sp)
+
+
+# THIS CODE HAS NOT BEEN RUN SINCE THE END OF JAKOB BARZAKS UROP
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+df_site_info=read.csv("data/Carbon/Seagrass_Site_Info_Data_QAQC_2019.csv")
+names(df_site_info)
+
+df_site_info=df_site_info%>%
+  dplyr::select(2:8,14,15,18:21)%>%
+  dplyr::mutate(Date=as.character(Date))%>%
+  dplyr::mutate(Date=mdy(Date))%>%
+  dplyr::mutate(month=month(Date))%>%
+  dplyr::mutate(year=year(Date))%>%
+  dplyr::select(1,14:15,2:13)%>%
+  dplyr::mutate(Region=as.character(Region),Region=ifelse(Region=="St Joe Bay","Saint Joe Bay",ifelse(Region=="St Marks","Saint Marks",Region)),Region=as.factor(Region))
+
+  
+names(df_site_info)<-c("Date","month","year","Region","Site","Latitude","Longitude","Latitude_Actual","Longitude_Actual","Depth_m","Secchi_m","Mono_Mixed","Seagrass_Landscape","Cover_Level","Notes")
+dim(df_site_info)
+names(df_site_info)
+
+df_site_info=df_site_info%>%
+  mutate(Latitude=ifelse(is.na(Latitude)==TRUE,Latitude_Actual,Latitude),Longitude=ifelse(is.na(Longitude)==TRUE,Longitude_Actual,Longitude))
+
+df=read.csv("Seagrass_Survey_Data_QAQC_2019.csv")
+head(df)
+
+df=df%>%
+  mutate(Reference=paste(df$Date,df$Region,df$Site,df$Quadrat,sep="_"))
+  
+df_site=df[c(21,1:9,13:16)]
+df_site=unique(df_site)
+
+df_long=df[c(21,10:12)]
+
+df_wide_species_cover=df_long%>%
+  dplyr::select(-Canopy_Height_cm)%>%
+  tidyr::spread(key=Species, value=Species_Cover,fill=0)%>%
+  dplyr::select(-"<NA>")
+
+df_wide_species_canopy_height=df_long%>%
+  dplyr::select(-Species_Cover)%>%
+  tidyr::spread(key=Species, value=Canopy_Height_cm,fill=0)
+
+
+df_site=plyr::join(df_site,df_site_info[c(-1)],by=c("Region","Site"))
+names(df_site)
+
+df_site=df_site%>%
+  dplyr::select(1:4,15:22,6:10,23:26)
+
+df_wide_species_cover=plyr::join(df_site,df_wide_species_cover,by="Reference")
+head(df_wide_species_cover)
+
+df_wide_species_cover$Seagrass_Health<-ifelse(df_wide_species_cover$Seagrass_Health>100,100,df_wide_species_cover$Seagrass_Health)
+
+
+df_wide_species_canopy_height=plyr::join(df_site,df_wide_species_canopy_height,by="Reference")
+
+
+write.csv(df_wide_species_cover,file="Seagrass_Species_Cover_QAQC.csv")
+
+```
+
+
+#loading environmental data
+```{r}
+
+library(sp)
+library(raster)
+
+biooracle_layers= "C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/BioOracle/data_output//"
+# dir.create(biooracle_layers)
+
+rs_list_study_region=list.files(path = biooracle_layers, pattern = ".tif$")
+rs_list_study_region=rs_list_study_region[c(-85)]
+
+rs_stack_study_region=raster::stack(paste(biooracle_layers,rs_list_study_region,sep=""))
+names(rs_stack_study_region)
+dim(rs_stack_study_region)
+
+# names(rs_stack_study_region)
+# plot(rs_stack_study_region$Dist_To_Shore)
+
+
+##changing the names of the raster stack
+names(rs_stack_study_region) = gsub(pattern = "Present.Benthic.Mean.Depth.", replacement = "", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "Present.Surface.", replacement = "", x = names(rs_stack_study_region))
+names(rs_stack_study_region)
+
+
+names(rs_stack_study_region) = gsub(pattern = "Present.Benthic.Depth", replacement = "Depth", x = names(rs_stack_study_region))
+# names(rs_stack_study_region) = gsub(pattern = "Temperature.Mean", replacement = "Temperature", x = names(rs_stack_study_region))
+# names(rs_stack_study_region) = gsub(pattern = "Salinity.Mean", replacement = "Salinity", x = names(rs_stack_study_region))
+# names(rs_stack_study_region) = gsub(pattern = "Dissolved.oxygen.Mean", replacement = "DissolvedO2", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_gravel", replacement = "Gravel_Percent", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_mud", replacement = "Mud_Percent", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_rock", replacement = "Rock_Percent", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_sand", replacement = "Sand_Percent", x = names(rs_stack_study_region))
+
+Coords<-coordinates(rs_stack_study_region)
+
+rs_stack_study_region$Longitude<-Coords[, 1]
+rs_stack_study_region$Latitude<-Coords[, 2]
+
+
+#making an inshore layer
+inshore=raster("C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/BioOracle/FL_State_Waters.tif")
+
+rs_stack_study_region$Rock_Percent[rs_stack_study_region$Rock_Percent<=0]<-0
+rs_stack_study_region$Rock_Percent[rs_stack_study_region$Rock_Percent>100]<-100
+plot(rs_stack_study_region$Rock_Percent)
+
+rs_stack_study_region$Gravel_Percent[rs_stack_study_region$Gravel_Percent<=0]<-0
+rs_stack_study_region$Gravel_Percent[rs_stack_study_region$Gravel_Percent>100]<-100
+plot(rs_stack_study_region$Gravel_Percent)
+
+
+rs_stack_study_region$Mud_Percent[rs_stack_study_region$Mud_Percent<=0]<-0
+rs_stack_study_region$Mud_Percent[rs_stack_study_region$Mud_Percent>100]<-100
+plot(rs_stack_study_region$Mud_Percent)
+
+
+rs_stack_study_region$Sand_Percent[rs_stack_study_region$Sand_Percent<=0]<-0
+rs_stack_study_region$Sand_Percent[rs_stack_study_region$Sand_Percent>100]<-100
+plot(rs_stack_study_region$Sand_Percent)
+
+
+
+Points=df_wide_species_cover
+coordinates(Points)<-~Longitude + Latitude
+proj4string(Points) <- CRS("+proj=longlat +datum=WGS84")
+
+#extracting values from biooracle rasters to points
+df_modeling_minmaxranges<-raster::extract(rs_stack_study_region,Points)
+
+
+df_wide_species_cover_environemntal_factors=cbind(df_wide_species_cover,df_modeling_minmaxranges)
+
+names(df_wide_species_cover_environemntal_factors)
+
+
+df_wide_species_cover_environemntal_factors=df_wide_species_cover_environemntal_factors[c(1:35,39:40,64:65,70:72,81:82,93,95,115,116)]
+
+write.csv(df_wide_species_cover_environemntal_factors,file="Seagrass_Species_Cover_QAQC_with_Environmental_Factors.csv")
+
+
+```
+
+

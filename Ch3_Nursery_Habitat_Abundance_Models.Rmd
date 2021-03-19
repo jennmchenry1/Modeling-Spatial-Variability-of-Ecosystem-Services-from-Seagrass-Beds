@@ -1,0 +1,217 @@
+---
+title: "Exploring_Nursery_Habitat_Patterns"
+author: "Jenn_McHenry"
+date: "5/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+#libraries needed
+library(utils)
+library(mgcv)
+library(pROC)
+library(tools)
+library(dplyr)
+library(ggplot2)
+library(doBy)
+library(dplyr)
+library(tidyr)
+library(plyr)
+# Use dredge to test sub-models
+library(MuMIn)
+library(raster)
+library(FSSgam)
+library(nnet)
+# Set the primary working directories
+
+odds_to_prob=function(x){
+        prob<-exp(x)/(1+exp(x))
+        return(prob)
+}
+
+```
+
+
+# loading data
+```{r}
+
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Probability_Modeling_January2021.RData")
+```
+
+
+```{r}
+data=data%>%
+  mutate(HA_PA=as.factor(HA_PA))
+
+
+#PINK SHRIMP ---  BASE MODELS
+#ABUNDANCE
+
+Pink_Shrimp_Abund_gam_base=mgcv::gam(as.integer(Pink.Shrimp) ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) +s(year,bs="cc",k=4),
+             family="nb",
+             data=data,
+             method="ML")
+summary(Pink_Shrimp_Abund_gam_base)
+
+qqnorm(residuals(Pink_Shrimp_Abund_gam_base,type = "deviance"))
+plot(Pink_Shrimp_Abund_gam_base$fitted.values,residuals(Pink_Shrimp_Abund_gam_base,type = "deviance"))
+plot(data$Latitude,residuals(Pink_Shrimp_Abund_gam_base,type = "deviance"))
+plot(data$Depth,residuals(Pink_Shrimp_Abund_gam_base,type = "deviance"))
+
+#testing for overdispersion
+resid.ssq <- sum(residuals(Pink_Shrimp_Abund_gam_base,type="pearson")^2)  ## sum of squares of Pearson resid
+resid.df <- Pink_Shrimp_Abund_gam_base$df.residual
+Dispersion_Parameter=resid.ssq/resid.df
+Dispersion_Parameter
+
+gam.check(Pink_Shrimp_Abund_gam_base)
+
+summary(Pink_Shrimp_Abund_gam_base)
+
+cor(data[,cont.preds])
+
+par(mfrow=c(2,3));plot.gam(Pink_Shrimp_Abund_gam_base,shade=TRUE,shade.col="lightblue",scheme=2,trans=exp,all.term=TRUE)
+
+model.set.Pink.Shrimp.Abund=generate.model.set(use.dat=data, 
+                                                test.fit=Pink_Shrimp_Abund_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+
+model.set.Pink.Shrimp.Abund$n.mods
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Abundance_Modeling_January2021.RData")
+# trying to run without any registerDoParallel commands for 30 cores.This didnt work.....
+# trying to run without any registerDoParallel commands for 20 cores. This didnt work either........
+# trying to run without any registerDoParallel commands for 30 cores. Trying again after reloading the workspace for just after I ran the seagrsss cover models selection.
+
+out.list.Pink.Shrimp.Abund=fit.model.set(model.set.Pink.Shrimp.Abund)
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Abundance_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.Pink.Shrimp.Abund)
+out.list.Pink.Shrimp.Abund$failed.models
+length(out.list.Pink.Shrimp.Abund$success.models)
+mod.table.Pink.Shrimp.Abund=out.list.Pink.Shrimp.Abund$mod.data.out
+mod.table.Pink.Shrimp.Abund=mod.table.Pink.Shrimp.Abund[order(mod.table.Pink.Shrimp.Abund$AICc),]
+head(mod.table.Pink.Shrimp.Abund)
+
+Pink_Shrimp_Abund_ModelTable_SpaceTime=mod.table.Pink.Shrimp.Abund
+
+write.csv(Pink_Shrimp_Abund_ModelTable_SpaceTime,file ="model_output/Pink_Shrimp_Abund_ModelTable.csv")
+
+# check the predictor correlation matrix
+Pink_Shrimp_Abund_ModelTable_SpaceTime$predictor.correlations
+
+Pink.Shrimp.Abund.all.less.2AICc=Pink_Shrimp_Abund_ModelTable_SpaceTime[which(Pink_Shrimp_Abund_ModelTable_SpaceTime$delta.AICc<2),]
+Pink.Shrimp.Abund.all.less.2AICc$formula
+
+
+# #Spotted Seatrout Abundance Best Model #################################
+Pink_Shrimp_Abund_gam_Best=mgcv::gam(as.integer(Pink.Shrimp) ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(Depth,k=4,bs="ts")+ te(Dissolved.oxygen.Min, Temperature.Min,k=4,bs="ts") + HA_PA,
+                                          family="nb",
+             data=data,
+             method="ML")
+
+# scaled to the mean and converted to abundance 
+par(mfrow=c(2,3));plot.gam(Pink_Shrimp_Abund_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,shift=coef(Pink_Shrimp_Abund_gam_Best)[1],trans=exp,all.term=TRUE)
+
+
+summary(Pink_Shrimp_Abund_gam_Best)
+gam.check(Pink_Shrimp_Abund_gam_Best)
+
+
+
+#GRAY SNAPPER ---  BASE MODELS
+#ABUNDANCE
+
+Gray_Snapper_Abund_gam_base=mgcv::gam(as.integer(Gray.Snapper) ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4),
+             family="nb",
+             data=data,
+             method="ML")
+summary(Gray_Snapper_Abund_gam_base)
+
+qqnorm(residuals(Gray_Snapper_Abund_gam_base,type = "deviance"))
+plot(Gray_Snapper_Abund_gam_base$fitted.values,residuals(Gray_Snapper_Abund_gam_base,type = "deviance"))
+plot(data$Latitude,residuals(Gray_Snapper_Abund_gam_base,type = "deviance"))
+plot(data$Depth,residuals(Gray_Snapper_Abund_gam_base,type = "deviance"))
+
+#testing for overdispersion
+resid.ssq <- sum(residuals(Gray_Snapper_Abund_gam_base,type="pearson")^2)  ## sum of squares of Pearson resid
+resid.df <- Gray_Snapper_Abund_gam_base$df.residual
+Dispersion_Parameter=resid.ssq/resid.df
+Dispersion_Parameter
+
+gam.check(Gray_Snapper_Abund_gam_base)
+
+
+cor(data[,cont.preds])
+
+par(mfrow=c(2,3));plot.gam(Gray_Snapper_Abund_gam_base,shade=TRUE,shade.col="lightblue",scheme=2,trans=exp,all.term=TRUE)
+
+model.set.Gray.Snapper.Abund=generate.model.set(use.dat=data, 
+                                                test.fit=Gray_Snapper_Abund_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.30,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+
+model.set.Gray.Snapper.Abund$n.mods
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Abundance_Modeling_January2021.RData")
+# trying to run without any registerDoParallel commands for 30 cores.This didnt work.....
+# trying to run without any registerDoParallel commands for 20 cores. This didnt work either........
+# trying to run without any registerDoParallel commands for 30 cores. Trying again after reloading the workspace for just after I ran the seagrsss cover models selection.
+
+out.list.Gray.Snapper.Abund=fit.model.set(model.set.Gray.Snapper.Abund)
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Abundance_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.Gray.Snapper.Abund)
+out.list.Gray.Snapper.Abund$failed.models
+length(out.list.Gray.Snapper.Abund$success.models)
+mod.table.Gray.Snapper.Abund=out.list.Gray.Snapper.Abund$mod.data.out
+mod.table.Gray.Snapper.Abund=mod.table.Gray.Snapper.Abund[order(mod.table.Gray.Snapper.Abund$AICc),]
+head(mod.table.Gray.Snapper.Abund)
+
+Gray_Snapper_Abund_ModelTable_SpaceTime=mod.table.Gray.Snapper.Abund
+
+write.csv(Gray_Snapper_Abund_ModelTable_SpaceTime,file ="model_output/Gray_Snapper_Abund_ModelTable.csv")
+
+# check the predictor correlation matrix
+Gray_Snapper_Abund_ModelTable_SpaceTime$predictor.correlations
+
+Gray.Snapper.Abund.all.less.2AICc=Gray_Snapper_Abund_ModelTable_SpaceTime[which(Gray_Snapper_Abund_ModelTable_SpaceTime$delta.AICc<2),]
+Gray.Snapper.Abund.all.less.2AICc$formula
+
+
+# #Spotted Seatrout Abundance Best Model #################################
+Gray_Snapper_Abund_gam_Best=mgcv::gam(as.integer(Gray.Snapper) ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(BottomVegCover,k=4,bs="ts")+ s(Latitude,k=4,bs="ts") + Sand + SY_PA,
+                                          family="gaussian",
+             data=data,
+             method="ML")
+
+# scaled to the mean and converted to abundance 
+par(mfrow=c(2,3));plot.gam(Gray_Snapper_Abund_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=exp,all.term=TRUE)
+
+
+summary(Gray_Snapper_Abund_gam_Best)
+gam.check(Gray_Snapper_Abund_gam_Best)
+
+
+```
+

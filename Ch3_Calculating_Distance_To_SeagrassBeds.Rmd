@@ -1,0 +1,52 @@
+---
+title: "Ch3_Calculating_Distance_To_SeagrassBeds"
+author: "Jenn_McHenry"
+date: "2/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+#setting and creating working directories 
+wd=getwd()
+data_dir=paste(wd,"/dataframes",sep="");dir.create(data_dir)
+plot_dir=paste(wd,"/plots",sep="");dir.create(plot_dir)
+output_dir=paste(wd,"/model_output",sep="");dir.create(output_dir)
+model_version_dir=paste(wd,"/model_versions",sep="");dir.create(model_version_dir)
+
+
+library(raster)
+library(sp)
+library(geosphere)
+library(rgeos)
+library(rgdal)
+
+```
+
+## Loading data
+
+```{r cars}
+#data points
+xy_points_proj<-readOGR("arc_output/FIM_Ref_Coords_Proj.shp")
+xy_points_proj<-xy_points_proj[c(1:6)] 
+
+xy_points<-spTransform(xy_points_proj,CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
+crs(xy_points)
+
+#seagrass beds FWC 2019 (latest as of April 2020)
+seagrass_beds_proj<-readOGR("data/FWC_Seagrass_Map_4222021_proj.shp")
+crs(seagrass_beds_proj)
+
+seagrass_beds<-spTransform(seagrass_beds_proj,CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
+
+crs(seagrass_beds)
+
+
+dist_to_seagrass<-dist2Line(p=xy_points,line=seagrass_beds)
+
+
+```
+
+

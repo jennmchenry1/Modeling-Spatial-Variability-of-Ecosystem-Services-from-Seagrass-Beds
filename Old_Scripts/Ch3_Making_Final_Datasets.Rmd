@@ -1,0 +1,333 @@
+---
+title: "Ch2_Running_Seagrass_Models"
+author: "Jenn_McHenry"
+date: "1/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#setting and creating working directories 
+wd=getwd()
+data_dir=paste(wd,"/dataframes",sep="");dir.create(data_dir)
+plot_dir=paste(wd,"/plots",sep="");dir.create(plot_dir)
+output_dir=paste(wd,"/model_output",sep="");dir.create(output_dir)
+model_version_dir=paste(wd,"/model_versions",sep="");dir.create(model_version_dir)
+
+#libraries
+# library(tidyverse)
+library(rlang)
+library(dplyr)
+library(plyr)
+library(colorspace)
+# library(tidyverse)
+library(lubridate)
+library(raster)
+library(sf)
+library(maptools)
+library(dplyr)
+library(lubridate)
+library(sp)
+library(benthos)
+library(vegan)
+library(lattice)
+library(ggsci)
+library(corrplot)
+library(data.table)
+library(rgdal)
+library(mgcv)
+# library(beatr)
+library(spatstat)
+library(dunn.test)
+library(mgcv)
+library(spatstat)
+library(rstantools)
+library(iNEXT)
+# library(devtools)
+library(tibble)
+# install_github("vqv/ggbiplot")
+# library(ggbiplot)
+# devtools::install_github("cran/mvpart")
+# library(mvpart)
+library(labdsv)
+library(cowplot)
+library(MuMIn)
+# library(VIF)
+library(visreg)
+library(AER)
+# library(coda)
+library(Hmsc)
+library(iNEXT)
+
+wd
+
+
+```
+
+
+#Loading data
+```{r}
+
+#Loading in the origial dataframe
+Final_DF=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/dataframes/FIM_Final_Biodiversity_Dataframe.csv")
+
+
+#Making a new dataframe that is prepared for modeling 
+df_modeling=Final_DF%>%
+  # dplyr::select(-Invertebrates)%>%
+  filter(Depth>=-6)%>%
+  mutate(ST_Mangroves=ifelse(ST_Mangroves>=1,1,ifelse(ST_Mangroves==0,0,NA)))%>%
+  dplyr::mutate(Gear_Factor=ifelse(Gear==5,"Seine_9.1m_3.1mm",ifelse(Gear==20,"Seine_21.3m_3.1mm",ifelse(Gear==22,"Seine_21.3m_3.1mm",ifelse(Gear==23,"Seine_21.3m_3.1mm",ifelse(Gear==160,"Seine_183m_37.5mm",ifelse(Gear==170,"Seine_183m_51mm",ifelse(Gear==180,"Seine_61m_25.4mm",ifelse(Gear==300,"OtterTrawl_6.1m_3.1mm",ifelse(Gear==301,"OtterTrawl_6.1m_3.1mm",NA))))))))))%>%
+  mutate(Bed_Type=ifelse(SAV.TH==100,"TT_Mono",ifelse(SAV.SY==100,"SY_Mono",ifelse(SAV.HA==100,"HA_Mono",ifelse(SAV_TOTAL>0 & Algae_TOTAL==0,"Mixed_Seagrass",ifelse(SAV_TOTAL>0 & Algae_TOTAL>0,"Mixed_Seagrass_Algae",ifelse(Vegetated==0,"Bare",NA)))))))%>%
+  filter(is.na(BottomVegCover)==FALSE)%>%
+  mutate(SAV.TH=SAV.TH/100,SAV.SY=SAV.SY/100,SAV.HA=SAV.HA/100)%>%
+  mutate(TH_Coverage=TH_Coverage/100,SY_Coverage=SY_Coverage/100,HA_Coverage=HA_Coverage/100)%>%
+  mutate(Gear_Type=ifelse(Gear_Factor=="OtterTrawl_6.1m_3.1mm","OtterTrawl",ifelse(Gear_Factor=="Seine_183m_37.5mm" | Gear_Factor=="Seine_183m_51mm","LargeSeine",ifelse(Gear_Factor=="Seine_21.3m_3.1mm","SmallSeine",NA))))
+
+
+#loading datasets from the florida keys
+FIM_FLKeys_df=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/Middle_Keys_Seine/Middle_Keys_SeineSurveys_SampleLocations.csv")
+# FIM_FLKeys_df_samples=read.csv("data/Middle_Keys_Seine/Middle_Keys_SeineSurveys_Samples.csv")
+
+names(FIM_FLKeys_df)
+head(FIM_FLKeys_df)
+
+FIM_FLKeys_df_fixed=as.data.frame(FIM_FLKeys_df)%>%
+  mutate(Reference=Survey,SDate=as.character(SDate),Date_fixed=as.Date(SDate,"%m/%d/%Y"),
+         year=year(Date_fixed),month=month(Date_fixed))%>%
+  dplyr::select(Reference,year,month,StartDepth:Long_DD,Temp_2:BV_TotalCover)
+
+names(FIM_FLKeys_df_fixed)<-c("Reference","year","month",
+                              "Depth","Latitude","Longitude",
+                              "Temperature","pH","Salinity","DissolvedO2",
+                              "BttmType1","BttmType2","BttmType3","BttmType4",
+                              "BttmVeg1","BV1_PercComp","BttmVeg2","BV2_PercComp",
+                              "BttmVeg3","BV3_PercComp","BttmVeg4","BV4_PercComp",
+                              "BottomVegCover")
+  head(FIM_FLKeys_df_fixed)
+  names(FIM_FLKeys_df_fixed)
+
+FIM_FLKeys_BottomType=FIM_FLKeys_df_fixed[c(1,11:14)]
+colnames(FIM_FLKeys_BottomType)<-c("Reference", "BttmType", "BttmType", "BttmType","BttmType")
+
+FIM_FLKeys_BottomType=rbind(FIM_FLKeys_BottomType[c(1:2)],FIM_FLKeys_BottomType[c(1,3)],
+                                  FIM_FLKeys_BottomType[c(1,4)],FIM_FLKeys_BottomType[c(1,5)])  
+
+FIM_FLKeys_BottomType_fixed=FIM_FLKeys_BottomType%>%
+  dplyr::filter(BttmType!="")%>%
+  dplyr::filter(BttmType!="H")%>%
+  dplyr::filter(BttmType!="D")%>%
+  droplevels()%>%
+  dplyr::mutate(PA=1)%>%
+  # dplyr::group_by(Reference)%>%
+  dplyr::count(Reference,BttmType)%>%
+  tidyr::spread(BttmType, n, fill = 0)
+
+
+FIM_FLKeys_Species_Composition=FIM_FLKeys_df_fixed[c(1:10,23,15:22)]
+colnames(FIM_FLKeys_Species_Composition)[12:19]<-c("BttmVeg1", "BV1_PercComp", 
+                                                     "BttmVeg1", "BV1_PercComp",
+                                                     "BttmVeg1", "BV1_PercComp", 
+                                                     "BttmVeg1", "BV1_PercComp")
+names(FIM_FLKeys_Species_Composition)
+
+FIM_FLKeys_Species_Composition_fixed=rbind(FIM_FLKeys_Species_Composition[c(1:13)],FIM_FLKeys_Species_Composition[c(1:11,14:15)],
+                                           FIM_FLKeys_Species_Composition[c(1:11,16:17)],FIM_FLKeys_Species_Composition[c(1:11,18:19)])  
+
+
+names(FIM_FLKeys_Species_Composition_fixed)
+
+FIM_FLKeys_Species_Cover=FIM_FLKeys_Species_Composition_fixed%>%
+  dplyr::mutate(BV1_PercComp=ifelse(BV1_PercComp=="X",10,BV1_PercComp),BttmVeg1=as.character(BttmVeg1),BttmVeg1=ifelse(BttmVeg1=="",NA,BttmVeg1))%>%
+  mutate(BV1_PercComp=as.integer(BV1_PercComp))%>%
+  dplyr::filter(is.na(BV1_PercComp)==FALSE)%>%
+  dplyr::group_by(Reference)%>%
+  tidyr::spread(key="BttmVeg1",value="BV1_PercComp",fill=0)%>%
+  dplyr::mutate(TH_Coverage=TH*10,SY_Coverage=SY*10,HA_Coverage=HA*10)
+
+names(FIM_FLKeys_Species_Cover)
+
+FIM_FLKeys_Species_Richness=FIM_FLKeys_Species_Cover%>%
+  dplyr::ungroup(Reference)%>%
+  dplyr::select(12:24)
+
+FIM_FLKeys_Species_Richness[FIM_FLKeys_Species_Richness>0]<-1
+
+FIM_FLKeys_Species_Richness=cbind(FIM_FLKeys_Species_Cover$Reference,FIM_FLKeys_Species_Richness)
+
+FIM_FLKeys_Species_Richness=FIM_FLKeys_Species_Richness%>%
+  mutate(SAV_Hill0=HA+SY+TH)
+
+FIM_FLKeys_Species_Richness=FIM_FLKeys_Species_Richness[c(1,15)]
+names(FIM_FLKeys_Species_Richness)<-c("Reference","SAV_Hill0")
+
+
+FIM_FLKeys_Seagrass_Communities=plyr::join(as.data.frame(FIM_FLKeys_Species_Cover),as.data.frame(FIM_FLKeys_Species_Richness),by="Reference")
+FIM_FLKeys_Seagrass_Communities=plyr::join(as.data.frame(FIM_FLKeys_Seagrass_Communities),as.data.frame(FIM_FLKeys_BottomType_fixed),by="Reference")
+names(FIM_FLKeys_Seagrass_Communities)
+
+
+```
+
+
+#Extracting Environmental Predictors
+```{r}
+############################################################################
+# ORIGINAL FIM DATA 
+#Making the FIM dataframe into spatailly referenced points
+Points=df_modeling
+coordinates(Points)<-~Longitude + Latitude
+proj4string(Points) <- CRS("+proj=longlat +datum=WGS84")
+
+#extracting values from biooracle rasters to points
+df_modeling_minmaxranges<-raster::extract(rs_stack_study_region,Points)
+
+df_modeling_updated=cbind(df_modeling[c(1:85,103:563)],df_modeling_minmaxranges)
+
+dim(df_modeling_updated)
+names(df_modeling_updated)
+
+
+#Variance exceeds mean, so negative binomial or quasi poisson may be appropriate
+names(df_modeling_updated)[630]<-c("pH.Mean")
+names(df_modeling_updated)[547]<-c("Depth.Mean")
+names(df_modeling_updated)[638]<-c("Light.bottom.Min.calculated")
+
+df_modeling_updated=df_modeling_updated[c(5:42,86:87,546,545,55:85,523:543,547:638,89:516)]
+summary(as.factor(df_modeling_updated$Gear_Type))
+summary(as.factor(df_modeling$SAM))
+
+names(df_modeling_updated)
+
+df_modeling_updated=df_modeling_updated%>%
+  filter(is.na(Gear_Type)==FALSE)%>%
+  filter(is.na(Mud_Percent)==FALSE)%>%
+  filter(SAM=="Visual" | SAM=="Unspecified" | SAM=="Camera" | SAM=="Tactile")%>%
+  # filter(is.na(Seagrass_Landscape)==FALSE)%>%
+  # filter(SAM!="Anchor")%>%
+  # filter(SAM!="Tactile")%>%
+  # filter(SAM!="Unspecified")%>%
+  droplevels()
+
+
+df_modeling_updated_faunal_species=df_modeling_updated%>%
+  dplyr::select(Reference,BottomVegCover,SAV_Hill0,TH_Coverage,SY_Coverage,HA_Coverage,
+         Longitude,Latitude,month,year, Depth,Temperature,pH, Salinity,DissolvedO2,
+         Dist_To_River,Dist_To_Shore,
+         Temperature.Mean, Temperature.Min,Temperature.Range, 
+         Chlorophyll.Mean, Chlorophyll.Range,
+         Salinity.Min, Salinity.Max,
+         Par.Mean, Light.bottom.Min.calculated,
+         Primary.productivity.Max,
+         Nitrate.Mean,Nitrate.Range,
+         Current.Velocity.Mean, Current.Velocity.Range, 
+         Dissolved.oxygen.Min,
+         Gravel_Percent, Mud_Percent, Sand_Percent, Rock_Percent,Mud,Sand,Rocks,ST_Oysters,ST_Mangroves,ST_Wetland_Vegetation,Alabama.Shad:Zostera.Shrimp,Hill0_raw:Hill2_raw,Gear_Type,SAM)
+names(df_modeling_updated_faunal_species)
+
+
+############################################################################
+#FLORIDA KEYS DATA
+#Making the FIM dataframe into spatailly referenced points
+Points=FIM_FLKeys_Seagrass_Communities[c(1:6,29:30,7:11,25:27)]
+coordinates(Points)<-~Longitude + Latitude
+proj4string(Points) <- CRS("+proj=longlat +datum=WGS84")
+
+#extracting values from biooracle rasters to points
+FIM_FLKeys_Seagrass_Communities_minmaxranges<-raster::extract(rs_stack_study_region,Points)
+
+FIM_FLKeys_Seagrass_Communities_updated=cbind(FIM_FLKeys_Seagrass_Communities,FIM_FLKeys_Seagrass_Communities_minmaxranges)
+names(FIM_FLKeys_Seagrass_Communities_updated)[114]<-c("pH.Mean")
+names(FIM_FLKeys_Seagrass_Communities_updated)[31]<-c("Depth.Mean")
+names(FIM_FLKeys_Seagrass_Communities_updated)[122]<-c("Light.bottom.Min.calculated")
+
+
+dim(FIM_FLKeys_Seagrass_Communities_updated)
+names(FIM_FLKeys_Seagrass_Communities_updated)
+
+df_modeling_updated_seagrass_FLKEYS=FIM_FLKeys_Seagrass_Communities_updated[c(1,11,28,25:27,5:6,3,2,4,7:10,29:33,103:105,37,39,92,90,113,62,84,67,69,43,45,115:119,122)]
+names(df_modeling_updated_seagrass_FLKEYS)
+
+df_modeling_updated_seagrass_FLKEYS$Rocks=1
+names(df_modeling_updated_seagrass_FLKEYS)[16:17]<-c("Mud","Sand")
+df_modeling_updated_seagrass_FLKEYS$ST_Oysters=NA
+df_modeling_updated_seagrass_FLKEYS$ST_Mangroves=NA
+df_modeling_updated_seagrass_FLKEYS$ST_Wetland_Vegetation=NA
+df_modeling_updated_seagrass_FLKEYS$SAM<-c("Visual")
+
+names(df_modeling_updated_seagrass_FLKEYS)
+
+
+
+df_modeling_updated_seagrass_FLKEYS=df_modeling_updated_seagrass_FLKEYS%>%
+  mutate(Sand=ifelse(Sand==2,1,Sand),TH_Coverage=TH_Coverage/100,SY_Coverage=SY_Coverage/100,HA_Coverage=HA_Coverage/100)%>%
+  mutate(Depth=Depth*-1)%>%
+  dplyr::select(Reference,BottomVegCover,SAV_Hill0,TH_Coverage,SY_Coverage,HA_Coverage,
+         Longitude,Latitude,month,year, Depth,Temperature,pH, Salinity,DissolvedO2,
+         Dist_To_River,Dist_To_Shore,
+         Temperature.Mean, Temperature.Min,Temperature.Range, 
+         Chlorophyll.Mean, Chlorophyll.Range,
+         Salinity.Min, Salinity.Max,
+         Par.Mean, Light.bottom.Min.calculated,
+         Primary.productivity.Max,
+         Nitrate.Mean,Nitrate.Range,
+         Current.Velocity.Mean, Current.Velocity.Range, 
+         Gravel_Percent, Mud_Percent, Sand_Percent,
+         Rock_Percent,Mud,Sand,Rocks,ST_Oysters,ST_Mangroves,ST_Wetland_Vegetation,SAM)
+
+names(df_modeling_updated_seagrass_FLKEYS)
+
+FIM_FLKeys_Hill0_df=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/Middle_Keys_Seine/Middle_Keys_SeineSurveys_Samples.csv")
+
+FIM_FLKeys_Hill0_df=FIM_FLKeys_Hill0_df%>%
+  dplyr::mutate(Reference=Survey)%>%
+  dplyr::group_by(Reference,Spp_Name)%>%
+  dplyr::summarize(Number=sum(Number_))
+
+
+FIM_FLKeys_Hill0_df_fixed=FIM_FLKeys_Hill0_df%>%
+  dplyr::group_by(Reference)%>%
+  dplyr::summarize(Hill0_raw=hill0(taxon = Spp_Name, count = Number),
+        Hill1_raw=hill1(taxon = Spp_Name, count = Number),
+        Hill2_raw=hill2(taxon = Spp_Name, count = Number),
+        Gear_Type=c("SmallSeines"))
+
+names(FIM_FLKeys_Hill0_df_fixed)
+
+
+df_modeling_updated_seagrass_FLKEYS=join(df_modeling_updated_seagrass_FLKEYS, FIM_FLKeys_Hill0_df_fixed,by="Reference")
+names(df_modeling_updated_seagrass_FLKEYS)
+names(df_modeling_updated_faunal_species)
+
+
+#############################################################################################COMBINGING KEYS DATA WITH THE REST OF THE FIM BIODIVERSITY DATA
+df_modeling_updated_faunal_species_COMPLETE=rbind.fill(df_modeling_updated_faunal_species,df_modeling_updated_seagrass_FLKEYS)
+
+names(df_modeling_updated_faunal_species_COMPLETE)
+summary(df_modeling_updated_faunal_species_COMPLETE)
+
+```
+
+```{r}
+
+############################################################################COMBINGING KEYS DATA WITH THE REST OF THE FIM BIODIVERSITY DATA
+df_modeling_updated_faunal_species_COMPLETE=df_modeling_updated_faunal_species_COMPLETE%>%
+  mutate(TH_Cover=TH_Coverage*100,SY_Cover=SY_Coverage*100,HA_Cover=HA_Coverage*100,TH_PA=ifelse(TH_Cover>0,1,TH_Cover),SY_PA=ifelse(SY_Cover>0,1,SY_Cover), HA_PA=ifelse(HA_Cover>0,1,HA_Cover),Seagrass_PA=ifelse(BottomVegCover>0,1,0))%>%
+  mutate(Seagrass_Category=ifelse(BottomVegCover<=0.05,1,ifelse(BottomVegCover<=50 & BottomVegCover>0.05,2,ifelse(BottomVegCover<=100 & BottomVegCover>50,3,NA))))%>%
+  mutate(TH_Category=ifelse(TH_Cover<=0.05,1,ifelse(TH_Cover<=50 & TH_Cover>0.05,2,ifelse(TH_Cover<=100 & TH_Cover>50,3,NA))))%>%
+    mutate(SY_Category=ifelse(SY_Cover<=0.05,1,ifelse(SY_Cover<=50 & SY_Cover>0.05,2,ifelse(SY_Cover<=100 & SY_Cover>50,3,NA))))%>%
+    mutate(HA_Category=ifelse(HA_Cover<=0.05,1,ifelse(HA_Cover<=50 & HA_Cover>0.05,2,ifelse(HA_Cover<=100 & SY_Cover>50,3,NA))))%>%
+  filter(Depth>=-4)
+
+summary(df_modeling_updated_faunal_species_COMPLETE$HA_Category)
+names(df_modeling_updated_faunal_species_COMPLETE)
+
+
+rm(list= ls()[!(ls() %in% c('wd','data_dir','plot_dir','output_dir','model_version_dir','biooracle_layers','inshore','rs_stack_study_region','df_modeling_updated_faunal_species_COMPLETE'))])
+
+write.csv(df_modeling_updated_faunal_species_COMPLETE,"C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/dataframes/FIM_Final_Biodiversity_Dataframe_Complete_Jan2021.csv")
+
+save.image("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_ESModel_Fitting_Datasets_January2021.RData")
+```
+

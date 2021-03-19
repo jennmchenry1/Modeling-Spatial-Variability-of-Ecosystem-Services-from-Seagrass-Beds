@@ -1,0 +1,514 @@
+---
+title: "Updated Analysis of Carbon DATA"
+author: "Jenn_McHenry"
+date: "3/02/2021"
+output: html_document
+---
+
+## R Markdown
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(plyr)
+library(raster)
+library(sp)
+library(ggplot2)
+```
+
+#Loading in the seagrass survey data 
+```{r}
+
+#Seagrass Data
+seagrass_surveys=read.csv("data/Carbon/Seagrass_Species_Cover_QAQC_with_Environmental_Factors.csv")
+head(seagrass_surveys)
+summary(seagrass_surveys)
+names(seagrass_surveys)
+
+seagrass_surveys=seagrass_surveys%>%
+  mutate(Seagrass_Spp=(Thalassia.testudinum+Syringodium.filiforme+Halodule.wrightii+Halophila.decipens+Halophila.engelmanni+Ruppia.maritima),Algal_Spp=(Acanthophora.spicifera+Caulerpa.verticillata+Halimeda.incrassata+Penicillus.capitatus+Sargassum+Udotea.flabellum))
+
+
+
+#Seagrass Clippings
+seagrass_clippings=read.csv("data/Carbon/Seagrass_Clippings_Data_version_11_23_2020.csv")
+
+seagrass_clippings=seagrass_clippings%>%
+  mutate(Dry_Weight_Corrected=Dry.Weight..g.- Boat.Weight..g.)
+
+names(seagrass_clippings)
+
+seagrass_clippings=seagrass_clippings[c(2:7,17,16)]
+
+colnames(seagrass_clippings)<-c("Site","Quadrat","Species","Common.Name","Species_Type","Biomass_Type","Sample_gDW","Notes")
+
+seagrass_clippings=seagrass_clippings%>%
+  dplyr::filter(Species_Type=="SAV" | Species_Type=="Algae")%>%
+  filter(Biomass_Type=="AGB" | Biomass_Type=="ABG")%>%
+  filter(Sample_gDW>0)
+summary(seagrass_clippings)
+names(seagrass_clippings)
+
+seagrass_clippings_Site=seagrass_clippings%>%
+  dplyr::group_by(Site,Species)%>%
+  dplyr::summarize(Biomass_gDW=mean(Sample_gDW))%>%
+  dplyr::filter(Species!="epiphytic_algae")%>%
+  tidyr::spread(key = Species,value = Biomass_gDW,fill = 0)%>%
+  mutate(Macro_Algae_Biomass_gDW=Acanthophora_spicifera+filamentous_red_algae+Halimeda_incrassata+Penicillus_sp +  branched_red_algae + Udotea_flabellum_)%>%
+  mutate(Seagrass_Biomass_gDW= Halodule_wrightii + Halophila_decipiens + Halophila_engelmanni + Ruppia_maritima + Syringodium_filiforme + Thalassia_testudinum) 
+
+names(seagrass_clippings_Site)
+
+colnames(seagrass_clippings_Site)<-c("Site","Acanthophora_spicifera_gDW", "Branched_red_algae","Filamentous_algae_gDW", "Halimeda_incrassata_gDW","Halodule_wrightii_gDW",
+                                     "Halophila_decipiens_gDW", 
+                                     "Halophila_engelmanni_gDW",
+                                     "Penicillus_sp_gDW",
+                                     "Ruppia_maritima_gDW",
+                                     "Syringodium_filiforme_gDW",
+                                     "Thalassia_testudinum_gDW",  
+                                     "Udotea_flabellum_gDW","Unidentified_Alga_gDW", "Macro_Algae_Biomass_gDW","Seagrass_Biomass_gDW" )
+
+levels(as.factor(seagrass_clippings$Quadrat))
+
+
+Compation_Ratio=read.csv("data/Carbon/Core_Length_Data_version_10_07_2020.csv")
+names(Compation_Ratio)
+colnames(Compation_Ratio)<-c("Date","Region","Site","Dive.Name","Original_Quadrat","Insertion_Depth_cm","Core_Length_cm","Compaction_Ratio","Alt_Number","Quadrat","Notes")
+dim(Compation_Ratio)
+Compation_Ratio=unique(Compation_Ratio)
+dim(Compation_Ratio)
+
+Compation_Ratio=Compation_Ratio[c(3,10,6:9)]
+
+Compation_Ratio=Compation_Ratio%>%
+  mutate(Core_Length_Corrected_cm=Core_Length_cm*(1/Compaction_Ratio))
+
+levels(Compation_Ratio$Site)
+
+
+#LOI Data
+LOI=read.csv("data/Carbon/LOI_Data_version_03_03_2021.csv")
+head(LOI)
+names(LOI)
+
+LOI_QAQC=LOI[c(2:8,11:12,23:35)]
+names(LOI_QAQC)
+head(LOI_QAQC)
+
+colnames(LOI_QAQC)=c("Site","Quadrat","Bagged_Slice_Number","Slice_Number","Analysis","Rhizome_Removed","Slice_Height_cm","Shell_gDW","Rhizome_gDW","Frac_OLOI","Frac_ILOI","OLOI","ILOI","Sample_Weight_gDW","Sediment_Weight_gDW","Sample_Density_g_per_ml","Sediment_Density_g_per_ml","Organic_Content_gDW","Inorganic_Content_gDW","Organic_Density_g_per_ml","Inorganic_Density_g_per_ml","Percent_Carbon")
+levels(LOI_QAQC$Site)
+levels(as.factor(LOI_QAQC$Quadrat))
+
+LOI_QAQC=join(Compation_Ratio[c(1:3,5,7)],LOI_QAQC,by=c("Site","Quadrat"))
+levels(Compation_Ratio$Site)
+levels(as.factor(Compation_Ratio$Quadrat))
+
+levels(LOI_QAQC$Site)
+levels(as.factor(LOI_QAQC$Quadrat))
+
+LOI_QAQC=LOI_QAQC%>%
+  dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*(1/Compaction_Ratio)),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
+ dplyr::mutate(Sample_Density_g_per_ml=Sample_Weight_gDW/Slice_Volume,
+         Sediment_Density_g_per_ml=Sediment_Weight_gDW/Slice_Volume,
+         Organic_Density_g_per_ml=Frac_OLOI * Sediment_Density_g_per_ml,
+         Inorganic_Density_g_per_ml=Frac_ILOI * Sediment_Density_g_per_ml)%>%
+ dplyr::mutate(Frac_Shell=Shell_gDW/Sample_Weight_gDW,
+         Shell_Density_g_per_ml=Frac_Shell*Sample_Density_g_per_ml,
+         Frac_Rhizome=Rhizome_gDW/Sample_Weight_gDW,
+         Rhizome_Density_g_per_ml=Frac_Rhizome*Sample_Density_g_per_ml)%>%
+  dplyr::select(1:10,26:27,11:25,28:31)%>%
+    dplyr::mutate(Factor=ifelse(Site=="SJBA" | Site=="SJBB" | Site=="SJBC" | Site=="SMARA" | Site=="SMARB" | Site=="SMARC" | Site=="STCHA" |Site=="STCHB" |Site=="STCHC"  ,"Control","Seagrass"),
+         Percent_Carbon=(0.4839*OLOI)-0.3648,
+         Percent_Carbon=ifelse(Percent_Carbon<0,0.001,Percent_Carbon))%>%
+  dplyr::mutate(Sediment_Depth_cm=Slice_Height_Corrected_cm*Slice_Number,
+         Sediment_Depth_Group=ifelse(Sediment_Depth_cm<=10,"0-10cm",ifelse(Sediment_Depth_cm>10 & Sediment_Depth_cm<=20,"10-20cm",ifelse(Sediment_Depth_cm>20 & Sediment_Depth_cm<=30,"20-30cm",ifelse(Sediment_Depth_cm>30 & Sediment_Depth_cm<=40,"30-40cm",ifelse(Sediment_Depth_cm>40 & Sediment_Depth_cm<=50,"40-50cm","below50cm"))))))%>%
+  dplyr::select(1:12,17:18,25:27,29,31:34)
+
+write.csv(LOI_QAQC,file="data_output/LOI_Data_version_QAQC_03_03_2020.csv")
+
+#Grain size analysis 
+Grainsize=read.csv("data/Carbon/Grainsize_Data_version_03_03_2021.csv")
+Grainsize=as.data.frame(Grainsize)
+head(Grainsize)
+summary(Grainsize)
+names(Grainsize)
+
+Grainsize_QAQC=Grainsize[c(2:11,18:23)]
+names(Grainsize_QAQC)
+levels(Grainsize_QAQC$Site)
+levels(LOI_QAQC$Site)
+
+
+colnames(Grainsize_QAQC)=c("Site","Quadrat","Bagged_Slice_Number","Slice_Number","Analysis","Rhyzome_Removed","Slice_Height_cm","Sample_Weight_gDW","Rhizome_gDW","Sediment_Weight_gDW","Frac_Pebbles","Frac_Gravel","Frac_Coarse_Sand","Frac_Medium_Sand","Frac_Fine_Sand","Frac_Silt")
+
+
+Grainsize_QAQC=join(Compation_Ratio[c(1:2,5,7)],Grainsize_QAQC,by=c("Site","Quadrat"))
+levels(Grainsize_QAQC$Site)
+
+
+Grainsize_QAQC=Grainsize_QAQC%>%
+  # mutate(Rhizome_Removed=ifelse(Slice_Number==4,"Y","N"))%>%
+    dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*(1/Compaction_Ratio)),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
+  mutate(Sample_Density_g_per_ml=Sample_Weight_gDW/Slice_Volume,
+         Sediment_Density_g_per_ml=Sediment_Weight_gDW/Slice_Volume,
+         Frac_Rhizome=Rhizome_gDW/Sample_Weight_gDW,
+         Rhizome_Density_g_per_ml=Frac_Rhizome*Sample_Density_g_per_ml,)%>%
+    dplyr::mutate(Factor=ifelse(Site=="SJBA" | Site=="SJBB" | Site=="SJBC" | Site=="SMARA" | Site=="SMARB" | Site=="SMARC" | Site=="STCHA" |Site=="STCHB" |Site=="STCHC" ,"Control","Seagrass"))%>%
+  mutate(Percent_Shell=Frac_Pebbles*100,Percent_Gravel=Frac_Gravel*100,Percent_Coarse=Frac_Coarse_Sand*100,Percent_Medium=Frac_Medium_Sand*100,Percent_Fine=Frac_Fine_Sand*100,Percent_Silt=Frac_Silt*100)%>%
+  dplyr::select(1:8,19:22,24:31)
+
+names(Grainsize_QAQC)
+
+Grainsize_QAQC=Grainsize_QAQC%>%
+  mutate(Percent_Sands=Percent_Coarse+Percent_Medium+Percent_Fine)
+
+write.csv(Grainsize_QAQC,file="data_output/Grainsize_Data_version_QAQC_03_03_2021.csv")
+
+
+```
+
+
+#Basic Plots
+```{r}
+names(LOI_QAQC)
+
+ggplot(Compation_Ratio,aes(x=Compaction_Ratio))+geom_histogram()+xlab("Compaction Ratio") +ylab("Number of Cores")
+
+ggplot(Compation_Ratio,aes(x=Core_Length_Corrected_cm))+geom_histogram()+xlab("Uncompressed Core Length (cm)") +ylab("Number of Cores")
+
+
+ggplot(LOI_QAQC,aes(x=(Sediment_Depth_cm)))+geom_histogram(binwidth = 1)+xlab("Sediment Depth (cm)") +ylab("Number of Core Slices")
+
+#Sediments
+Grainsize_QAQC_long=Grainsize_QAQC%>%
+  dplyr::select(1:2,9:20)%>%
+  gather(key="Grainsize","Percent",9:14)
+
+
+#grainsizes
+ggplot(Grainsize_QAQC_long,aes(x=as.integer(Percent),fill=Grainsize))+geom_density(position = "dodge",alpha=0.25) + xlab("Percent Grainsize per Slice") + ylab("Frequency")
+
+```
+
+
+
+#Combinging analytical datasets 
+```{r}
+names(LOI_QAQC)
+
+LOI_QAQC_By_Site_Slice=LOI_QAQC%>%
+  dplyr::group_by(Site,Factor,Quadrat,Bagged_Slice_Number,Slice_Number,Slice_Height_Corrected_cm,Sediment_Depth_cm,Sediment_Depth_Group)%>%
+  dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE),Organic_Density_g_per_ml=mean(Organic_Density_g_per_ml,na.rm=TRUE),Inorganic_Density_g_per_ml=mean(Inorganic_Density_g_per_ml,na.rm=TRUE),Percent_Carbon=mean(Percent_Carbon,na.rm=TRUE),Rhizome_Density_g_per_ml=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),Shell_Density_g_per_ml=mean(Shell_Density_g_per_ml,na.rm=TRUE))%>%
+  ungroup()%>%
+  filter(is.na(OLOI)==FALSE)%>%
+  dplyr::mutate(Organic_Carbon_Density_g_per_ml=(Percent_Carbon/100) * Organic_Density_g_per_ml,
+         Inorganic_Carbon_Density_g_per_ml=(Inorganic_Density_g_per_ml* 0.12),
+         Total_Carbon_Density_g_per_ml=Organic_Carbon_Density_g_per_ml+Inorganic_Carbon_Density_g_per_ml)
+
+summary(LOI_QAQC_By_Site_Slice)
+
+ggplot(LOI_QAQC_By_Site_Slice,aes(x=(Sediment_Depth_cm)))+geom_histogram(binwidth = 1)+xlab("Sediment Depth (cm)") +ylab("Frequency")
+
+
+#OM %
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=as.integer(OLOI),fill=Factor),na.rm=TRUE)+geom_boxplot() +ylab("Sedimentary Organics Per Slice") + xlab("") +facet_wrap(~Sediment_Depth_Group,nrow=1)+ ggtitle("Organic Matter by Sediment Depth Bin (%)")
+
+
+#OM Density
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Organic_Density_g_per_ml),fill=Factor),na.rm=TRUE)+geom_boxplot() + ylab("Organic Density of Slice") + ylab("") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ ggtitle("Organic Density by Sediment Depth Bin (g/ ml)")
+
+#IOM %
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=as.integer(ILOI),fill=Factor),na.rm=TRUE)+geom_boxplot() + ylab("Sedimentary Carbonates Per Slice") + ylab("") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ggtitle("Carbonates by Sediment Depth Bin (%)")
+
+#Inorganic Density
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Inorganic_Density_g_per_ml),fill=Factor),na.rm=TRUE)+geom_boxplot() + ylab("Carbonate Density of Slice") + xlab("") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ ggtitle("Carbonate Density by Sediment Depth Bin (g/ ml)")
+
+#%C
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Percent_Carbon),fill=Factor),na.rm=TRUE)+geom_boxplot() + ylab("Organic Carbon Per Slice") + ylab("") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ggtitle("Organic Carbon by Sediment Depth Bin (%)")
+
+#Organic Carbon Density
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Organic_Carbon_Density_g_per_ml),fill=Factor),na.rm=TRUE)+geom_boxplot() + xlab("Organic Carbon Density of Slice") + ylab("Number of Core Slices") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ ggtitle("Organic Carbon Density by Sediment Depth Bin (g/ml)")
+
+#Total Carbon Density
+ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Total_Carbon_Density_g_per_ml),fill=Factor),na.rm=TRUE)+geom_boxplot() + xlab("Total Caron Density of Slice") + ylab("Number of Core Slices") +facet_wrap(~Sediment_Depth_Group,nrow=2)+ ggtitle("Total Carbon Density by Sediment Depth Bin (g/ ml)")
+
+
+## BY DEPTH
+# Percent OLOI
+LOI_QAQC_By_Site_Slice%>%
+  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::summarize(mean=mean(OLOI,na.rm=TRUE))%>%
+  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OM % of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Organic Matter by Sediment Depth ")+coord_flip()
+
+# Organic Carbon Density
+LOI_QAQC_By_Site_Slice%>%
+  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::summarize(mean=mean(Organic_Carbon_Density_g_per_ml,na.rm=TRUE))%>%
+  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OC Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Organic Carbon Density by Sediment Depth ")+coord_flip()
+
+
+# Inorganic Carbon Density
+LOI_QAQC_By_Site_Slice%>%
+  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::summarize(mean=mean(Inorganic_Carbon_Density_g_per_ml,na.rm=TRUE))%>%
+  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("IOC Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Inorganic Carbon Density by Sediment Depth ")+coord_flip()
+
+
+#  Total Carbon Density
+LOI_QAQC_By_Site_Slice%>%
+  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::summarize(mean=mean(Total_Carbon_Density_g_per_ml,na.rm=TRUE))%>%
+  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("Total C Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Total Carbon Density by Sediment Depth ")+coord_flip()
+
+
+LOI_QAQC_By_Site=LOI_QAQC_By_Site_Slice%>%
+  mutate(Organic_accum_per_cm=Organic_Density_g_per_ml*Slice_Height_Corrected_cm,
+  Inorganic_accum_per_cm=Inorganic_Density_g_per_ml*Slice_Height_Corrected_cm,
+  Shell_accum_per_cm=Shell_Density_g_per_ml*Slice_Height_Corrected_cm,
+  Rhizome_accum_per_cm=Rhizome_Density_g_per_ml*Slice_Height_Corrected_cm,
+  Organic_Carbon_accum_per_cm=Organic_Carbon_Density_g_per_ml*Slice_Height_Corrected_cm,
+  Inorganic_Carbon_accum_per_cm=Inorganic_Carbon_Density_g_per_ml*Slice_Height_Corrected_cm)%>%
+  dplyr::group_by(Site,Factor,Quadrat)%>%
+  dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),
+                   ILOI=mean(ILOI,na.rm=TRUE),
+                   Carbon=mean(Percent_Carbon,na.rm=TRUE),
+                   Organic_accum_per_cm=mean(Organic_accum_per_cm,na.rm=TRUE),
+                   Inorganic_accum_per_cm=mean(Inorganic_accum_per_cm,na.rm=TRUE),
+                   Shell_accum_per_cm=mean(Shell_accum_per_cm,na.rm=TRUE),
+                   Rhizome_accum_per_cm=mean(Rhizome_accum_per_cm,na.rm=TRUE),
+                   Organic_Carbon_accum_per_cm=mean(Organic_Carbon_accum_per_cm,na.rm=TRUE),
+                   Inorganic_Carbon_accum_per_cm=mean(Inorganic_Carbon_accum_per_cm,na.rm=TRUE))%>%
+  dplyr::mutate(OM_g_per_sqm=Organic_accum_per_cm*50*10000,
+         IOM_g_per_sqm=Inorganic_accum_per_cm*50*10000,
+         Shell_g_per_sqm=Shell_accum_per_cm*50*10000,
+         Rhizome_g_per_sqm=Rhizome_accum_per_cm*10*10000,
+         OC_Stock_g_per_sqm=Organic_Carbon_accum_per_cm*50*10000,
+         IOC_Stock_g_per_sqm=Inorganic_Carbon_accum_per_cm*50*10000,
+         Total_C_Stock_g_per_sqm=IOC_Stock_g_per_sqm+OC_Stock_g_per_sqm)%>%
+  dplyr::ungroup()%>%
+  dplyr::group_by(Site,Factor)%>%
+  dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),
+                   ILOI=mean(ILOI,na.rm=TRUE),
+                   Carbon=mean(Carbon,na.rm=TRUE),
+                   Rhizome_Stock_g_per_sqm=mean(Rhizome_g_per_sqm,na.rm=TRUE),
+                   Shell_Stock_g_per_sqm=mean(Shell_g_per_sqm,na.rm=TRUE),
+                   Organic_Carbon_Stock_g_per_sqm=mean(OC_Stock_g_per_sqm,na.rm=TRUE),
+                   Inorganic_Carbon_Stock_g_per_sqm=mean(IOC_Stock_g_per_sqm,na.rm=TRUE),
+                   Total_Carbon_Stock_g_per_sqm=mean(Total_C_Stock_g_per_sqm,na.rm=TRUE))%>%
+      ungroup()
+
+
+seagrass_surveys_By_Site=seagrass_surveys%>%
+  group_by(Region,Site,Quadrat,Cover_Level)%>%
+  dplyr::summarize(SAV_Cover=mean(SAV_Cover,na.rm=TRUE),Secchi_m=mean(Secchi_m,na.rm=TRUE),Depth_m=mean(Depth_m,na.rm=TRUE),Thalassia.testudinum=mean(Thalassia.testudinum,na.rm=TRUE),Syringodium.filiforme=mean(Syringodium.filiforme,na.rm=TRUE),Halodule.wrightii=mean(Halodule.wrightii,na.rm=TRUE),Seagrass_Spp=mean(Seagrass_Spp,na.rm=TRUE),Algal_Spp=mean(Algal_Spp,na.rm=TRUE))%>%
+  ungroup()%>%
+  group_by(Region,Site,Cover_Level)%>%
+  dplyr::summarize(SAV_Cover=mean(SAV_Cover,na.rm=TRUE),Secchi_m=mean(Secchi_m,na.rm=TRUE),Depth_m=mean(Depth_m,na.rm=TRUE),Thalassia.testudinum=mean(Thalassia.testudinum,na.rm=TRUE),Syringodium.filiforme=mean(Syringodium.filiforme,na.rm=TRUE),Halodule.wrightii=mean(Halodule.wrightii,na.rm=TRUE),Seagrass_Spp=mean(Seagrass_Spp,na.rm=TRUE),Algal_Spp=mean(Algal_Spp,na.rm=TRUE))%>%
+  ungroup()
+
+
+Environmental_Factors_Sites=seagrass_surveys%>%
+  dplyr::select(Site,Latitude,Longitude,Salinity.Min,Nitrate.Mean,Light.bottom.Min,Par.Mean,Dist_To_River,Dist_To_Shore)%>%
+  group_by(Site)%>%
+  dplyr::summarize(Latitude=mean(Latitude,na.rm=TRUE),Longitude=mean(Longitude,na.rm=TRUE),Salinity.Min=mean(Salinity.Min,na.rm=TRUE),Nitrate.Mean=mean(Nitrate.Mean,na.rm=TRUE),Light.bottom.Min=mean(Light.bottom.Min,na.rm=TRUE),Par.Mean=mean(Par.Mean,na.rm=TRUE),Dist_To_River=mean(Dist_To_River,na.rm=TRUE),Dist_To_Shore=mean(Dist_To_Shore,na.rm=TRUE))%>%
+  ungroup()
+
+
+seagrass_surveys_By_Site=join(seagrass_surveys_By_Site,Environmental_Factors_Sites,by="Site")
+
+
+seagrass_survey_AND_Clippings_By_Site=join(seagrass_surveys_By_Site,seagrass_clippings_Site[c(1,16,15,12,11,6)],by="Site")
+
+write.csv(seagrass_survey_AND_Clippings_By_Site,"data_output/Seagrass_Clippings_QAQC_Site_03_03_2021.csv")
+
+
+
+Grainsize_QAQC_By_Site_Slice=Grainsize_QAQC%>%
+  group_by(Site,Slice_Number)%>%
+  dplyr::summarize(Percent_Shell=mean(Percent_Shell,na.rm=TRUE),Percent_Gravel=mean(Percent_Gravel,na.rm=TRUE),Percent_Coarse=mean(Percent_Coarse,na.rm=TRUE),Percent_Medium=mean(Percent_Medium,na.rm=TRUE),Percent_Fine=mean(Percent_Fine,na.rm=TRUE),Percent_Silt=mean(Percent_Silt,na.rm=TRUE),Percent_Sands=mean(Percent_Sands,na.rm=TRUE))%>%
+  ungroup()
+
+
+Grainsize_QAQC_By_Site=Grainsize_QAQC%>%
+  group_by(Site)%>%
+  dplyr::summarize(Percent_Shell=mean(Percent_Shell,na.rm=TRUE),Percent_Gravel=mean(Percent_Gravel,na.rm=TRUE),Percent_Coarse=mean(Percent_Coarse,na.rm=TRUE),Percent_Medium=mean(Percent_Medium,na.rm=TRUE),Percent_Fine=mean(Percent_Fine,na.rm=TRUE),Percent_Silt=mean(Percent_Silt,na.rm=TRUE),Percent_Sands=mean(Percent_Sands,na.rm=TRUE))%>%
+  ungroup()
+names(Grainsize_QAQC_By_Site)
+```
+
+
+
+
+
+
+
+
+#MAKING THE BLUE CARBON DATASET 
+```{r}
+BlueCarbon_QAQC=plyr::join(seagrass_surveys_By_Site,LOI_QAQC_By_Site,by=c("Site"),match="all",type="inner")
+
+names(BlueCarbon_QAQC)
+
+BlueCarbon_QAQC=plyr::join(BlueCarbon_QAQC,Grainsize_QAQC_By_Site,by=c("Site"),match="all",type="inner")
+names(BlueCarbon_QAQC)
+
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(Cover_Level=ifelse(SAV_Cover>=50,"high",ifelse(SAV_Cover<50 | SAV_Cover>0,"low","none")))%>%
+  mutate(TH_PA=ifelse(Thalassia.testudinum>0,1,0),SY_PA=ifelse(Syringodium.filiforme>0,1,0),HA_PA=ifelse(Halodule.wrightii>0,1,0),TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA))
+
+summary(BlueCarbon_QAQC)
+
+#%OM
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=OLOI))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Percent Organic Matter")
+
+#%IOM
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=ILOI))+geom_boxplot() +xlab("Survey Strata")+ylab("Average Percent Sedimentary Carbonates")
+
+# Carbon Stock
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=Organic_Carbon_Stock_g_per_sqm,fill=Factor))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Organic Carbon Stock (g/sqm)")
+
+# Inorganic Carbon Stock
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=Inorganic_Carbon_Stock_g_per_sqm,fill=Factor))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Inorganic Carbon Stock (gC/sqm)")
+
+
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=Total_Carbon_Stock_g_per_sqm,fill=Factor))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Total Carbon Stock (gC/sqm)")
+
+
+# Rhizome g/sqm
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=Rhizome_Stock_g_per_sqm,fill=Factor))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Rhizome Carbon Stock (g/sqm)")
+
+# SHell g/sqm
+BlueCarbon_QAQC%>%
+  dplyr::group_by(Factor)%>%
+  # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+  ggplot(aes(x=Factor,y=Shell_Stock_g_per_sqm,fill=Factor))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Shell Stock (g/sqm)")
+
+# Seagrass Cover 
+ggplot(BlueCarbon_QAQC,aes(x=SAV_Cover,y=OLOI))+ geom_point()+geom_smooth(method="gam")
+
+
+ggplot(BlueCarbon_QAQC,aes(x=Seagrass_Spp,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point() +geom_smooth(method="gam")
+# 
+
+ggplot(BlueCarbon_QAQC,aes(x=Thalassia.testudinum,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+
+BlueCarbon_QAQC%>%
+  mutate(TH_PA=as.factor(TH_PA))%>%
+  dplyr::filter(Factor=="Seagrass")%>%
+  ggplot(aes(y=Organic_Carbon_Stock_g_per_sqm,x=TH_PA,fill=TH_PA)) + geom_boxplot()
+
+
+ggplot(BlueCarbon_QAQC,aes(x=Syringodium.filiforme,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+BlueCarbon_QAQC%>%
+  mutate(SY_PA=as.factor(SY_PA))%>%
+  dplyr::filter(Factor=="Seagrass")%>%
+  ggplot(aes(y=Organic_Carbon_Stock_g_per_sqm,x=SY_PA,fill=SY_PA)) + geom_boxplot()
+
+ggplot(BlueCarbon_QAQC,aes(x=Halodule.wrightii,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+
+BlueCarbon_QAQC%>%
+  mutate(HA_PA=as.factor(HA_PA))%>%
+  dplyr::filter(Factor=="Seagrass")%>%
+  ggplot(aes(y=Organic_Carbon_Stock_g_per_sqm,x=HA_PA,fill=HA_PA)) + geom_boxplot()
+
+ggplot(BlueCarbon_QAQC,aes(x=Secchi_m,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Depth_m,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Percent_Shell,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Percent_Gravel,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Percent_Sands,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Percent_Silt,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Salinity.Min,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Nitrate.Mean,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Light.bottom.Min,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Par.Mean,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Dist_To_River,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Dist_To_Shore,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Latitude,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+ggplot(BlueCarbon_QAQC,aes(x=Longitude,y=Organic_Carbon_Stock_g_per_sqm))+ geom_point()+geom_smooth(method="gam")
+
+
+BlueCarbon_QAQC%>%
+   dplyr::group_by(Region)%>%
+   dplyr::summarize(Nitrates=mean(Nitrate.Mean,na.rm=TRUE), Depth=mean(Depth_m,na.rm=TRUE), Secchi_m=mean(Secchi_m,na.rm=TRUE),Dist_To_Shore=mean(Dist_To_Shore,na.rm=TRUE),Dist_To_River=mean(Dist_To_River,na.rm=TRUE),Light=mean(Light.bottom.Min,na.rm=TRUE))
+ 
+#  
+# FWCC_Seagrass_Maps=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/SG_FWC_4_2020.tif")
+# names(FWCC_Seagrass_Maps)<-c("FWCC_Seagrass_Maps")
+# 
+# coordinates(BlueCarbon_QAQC)<- ~Longitude + Latitude
+# 
+# Mapped_points=extract(x=FWCC_Seagrass_Maps,y=BlueCarbon_QAQC)
+# 
+# FWCC_Seagrass_Extent=as.vector(Mapped_points)
+# summary(FWCC_Seagrass_Extent)
+# 
+# BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent))
+# names(BlueCarbon_QAQC)[36]<-c("FWCC_Seagrass_Extent")
+# 
+# BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+#   mutate(FWCC_Seagrass_Extent=ifelse(is.na(FWCC_Seagrass_Extent)==TRUE,0,FWCC_Seagrass_Extent))
+# 
+# summary(BlueCarbon_QAQC)
+# names(BlueCarbon_QAQC)
+# 
+# 
+# summary(as.factor(BlueCarbon_QAQC$FWCC_Seagrass_Extent))
+# 
+# # Rhizome g/sqm
+# BlueCarbon_QAQC%>%
+#   group_by(FWCC_Seagrass_Extent)%>%
+#   # dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE))%>%
+#   ggplot(aes(x=FWCC_Seagrass_Extent,y=Rhizome_Stock_g_per_sqm))+geom_boxplot()+xlab("Survey Strata")+ylab("Average Rhizome Carbon Stock (g/sqm)")
+
+
+write.csv(BlueCarbon_QAQC,file="data_output/BlueCarbon_QAQC.csv")
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Datasets.RData")
+
+```
+
+

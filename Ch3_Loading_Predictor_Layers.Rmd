@@ -1,0 +1,110 @@
+---
+title: "Ch2_Loading_Predictor_Layers"
+author: "Jenn_McHenry"
+date: "1/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+#Loading biooracle rasters 
+```{r}
+biooracle_layers= "C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/data_output//"
+
+
+rs_list_study_region=list.files(path = biooracle_layers, pattern = ".tif$")
+rs_list_study_region=rs_list_study_region[c(-4)]
+
+rs_stack_study_region=raster::stack(paste(biooracle_layers,rs_list_study_region,sep=""))
+
+
+names(rs_stack_study_region)
+dim(rs_stack_study_region)
+
+# names(rs_stack_study_region)
+plot(rs_stack_study_region$Dist_To_Shore)
+
+
+
+
+##changing the names of the raster stack
+names(rs_stack_study_region) = gsub(pattern = "Present.Benthic.Mean.Depth.", replacement = "", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "Present.Surface.", replacement = "", x = names(rs_stack_study_region))
+names(rs_stack_study_region)
+
+# names(rs_stack_study_region) = gsub(pattern = "Present.Benthic.Depth", replacement = "Depth", x = names(rs_stack_study_region))
+# names(rs_stack_study_region) = gsub(pattern = "Temperature.Mean", replacement = "Temperature", x = names(rs_stack_study_region))
+# names(rs_stack_study_region) = gsub(pattern = "Salinity.Mean", replacement = "Salinity", x = names(rs_stack_study_region))
+# names(rs_stack_study_region) = gsub(pattern = "Dissolved.oxygen.Mean", replacement = "DissolvedO2", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_gravel", replacement = "Gravel_Percent", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_mud", replacement = "Mud_Percent", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_rock", replacement = "Rock_Percent", x = names(rs_stack_study_region))
+names(rs_stack_study_region) = gsub(pattern = "USSB_sand", replacement = "Sand_Percent", x = names(rs_stack_study_region))
+
+Coords<-coordinates(rs_stack_study_region)
+
+rs_stack_study_region$Longitude<-Coords[, 1]
+rs_stack_study_region$Latitude<-Coords[, 2]
+
+
+#making an inshore layer
+inshore=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/FL_State_Waters.tif")
+
+rs_stack_study_region$Rock_Percent[rs_stack_study_region$Rock_Percent<=0]<-0
+rs_stack_study_region$Rock_Percent[rs_stack_study_region$Rock_Percent>100]<-100
+plot(rs_stack_study_region$Rock_Percent)
+
+rs_stack_study_region$Gravel_Percent[rs_stack_study_region$Gravel_Percent<=0]<-0
+rs_stack_study_region$Gravel_Percent[rs_stack_study_region$Gravel_Percent>100]<-100
+plot(rs_stack_study_region$Gravel_Percent)
+
+
+rs_stack_study_region$Mud_Percent[rs_stack_study_region$Mud_Percent<=0]<-0
+rs_stack_study_region$Mud_Percent[rs_stack_study_region$Mud_Percent>100]<-100
+plot(rs_stack_study_region$Mud_Percent)
+
+
+rs_stack_study_region$Sand_Percent[rs_stack_study_region$Sand_Percent<=0]<-0
+rs_stack_study_region$Sand_Percent[rs_stack_study_region$Sand_Percent>100]<-100
+plot(rs_stack_study_region$Sand_Percent)
+
+Light.bottom.min.calculated=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/Light_Calculations/Light_Min_calc.tif")
+
+
+rs_stack_study_region=stack(rs_stack_study_region,Light.bottom.min.calculated)
+
+rm(list= ls()[!(ls() %in% c('wd','data_dir','plot_dir','output_dir','model_version_dir','df_modeling','biooracle_layers','inshore','rs_stack_study_region'))])
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter2_Predictor_Layers_Jan2021.RData")
+
+
+```
+
+#PCA of envrionmental conditions
+```{r}
+# PCA to figure out which variables to keep
+names(df_modeling_updated_seagrass_COMPLETE)
+
+covariate_PCA=prcomp(df_modeling_updated_seagrass_COMPLETE[c(11,16:31)],scale=TRUE,center=TRUE)
+
+summary(covariate_PCA)
+biplot(covariate_PCA)
+covariate_PCA$rotation
+# covariate_PCA$loadings
+
+## S3 method for class 'prcomp':
+screeplot(covariate_PCA, bstick = FALSE, type = c("lines"),
+         npcs = min(10, length(covariate_PCA$sdev)),
+         ptype = "o", bst.col = "red", bst.lty = "solid",
+         xlab = "Component", ylab = "Inertia",
+         main = deparse(substitute(x)))
+
+# note the use of the 'index' argument
+PCA_predict <- predict(rs_stack_study_region, covariate_PCA, index=1:4)
+```
+

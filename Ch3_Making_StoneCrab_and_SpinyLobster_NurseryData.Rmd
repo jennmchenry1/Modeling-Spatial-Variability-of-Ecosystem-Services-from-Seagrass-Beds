@@ -1,0 +1,238 @@
+---
+title: "Ch3_Making_StoneCrab_and_SpinyLobster_NurseryData"
+author: "Jenn_McHenry"
+date: "1/30/2021"
+output: html_document
+---
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+#setting and creating working directories 
+wd=getwd()
+data_dir=paste(wd,"/data",sep="");dir.create(data_dir)
+plot_dir=paste(wd,"/plots",sep="");dir.create(plot_dir)
+output_dir=paste(wd,"/data_output",sep="");dir.create(output_dir)
+arc_output_dir=paste(wd,"/arc_output",sep="");dir.create(arc_output_dir)
+
+#libraries
+library(dplyr)
+library(plyr)
+library(tidyverse)
+library(lubridate)
+library(raster)
+library(sf)
+library(rgdal)
+library(maptools)
+library(dplyr)
+library(lubridate)
+library(sp)
+library(benthos)
+library(vegan)
+library(lattice)
+library("ggsci")
+# library(rLakeAnalyzer)
+library(vegan)
+# library(tidyr)
+library(iNEXT)
+wd
+
+
+```
+
+
+
+##Adding gear and effort inforamtion
+```{r}
+#####NOTE TO SELF! MAK SURE TO CORRECT THE DATA FOR EFFORT!!!!
+
+Effort=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/dataframes/FIM_Effort_Correction.csv")
+
+Gear_info=read.csv(file = "C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/FWRI_FIM_SQL_Database_ALL/Gear_info.csv")
+
+Gear_info=Gear_info%>%
+  mutate(Dist_tow=as.numeric(Dist_tow))
+
+
+#adding an effort column
+FIM_SQL_Gear=plyr::join(Effort,Gear_info,by="Reference",type="left",match="all")
+
+names(FIM_SQL_Gear)
+str(FIM_SQL_Gear)
+
+FIM_SQL_Gear_Corrected=FIM_SQL_Gear%>%
+  dplyr::select(Reference,Gear,Wng_dpth,NetWidth,Soaktime,Dist_tow)%>%
+  dplyr::mutate(Wng_dpth=ifelse(Wng_dpth=="NULL",NA,Wng_dpth),NetWidth=ifelse(NetWidth=="NULL",NA,NetWidth),Soaktime=ifelse(Soaktime=="NULL",NA,Soaktime),Dist_tow=ifelse(Dist_tow=="NULL",NA,Dist_tow))%>%
+  dplyr::mutate(Effort_Correction=ifelse(Gear==300 | Gear==301 | Gear==306,((Dist_tow*4*1853)/100), ifelse(Gear==1 | Gear==2, 0.3117, ifelse(Gear==5, 0.11,ifelse(Gear==11 | Gear==13 | Gear==20 | Gear==21 | Gear==25 | Gear==26 | Gear==29 | Gear==100 | Gear==102 | Gear==103 | Gear==104 | Gear==105 | Gear==107 | Gear==107, 1.4, ifelse(Gear==12 | Gear==22 | Gear==24 | Gear==27 | Gear==28, 3.38, ifelse(Gear==10 | Gear==23, 0.68, ifelse(Gear==160, 41.20, ifelse(Gear==170, 22.09, ifelse(Gear==180, 4.65, ifelse(Gear==204 | Gear==205 | Gear==206 | Gear==207 | Gear==208 | Gear==209 | Gear==403 | Gear==404 | Gear==405 | Gear==406 | Gear==409 | Gear==410, NA, ifelse(Gear==300 | Gear==301 | Gear==306, NA, ifelse(Gear==350 | Gear==351 | Gear==354, 1, NA)))))))))))))
+
+summary(FIM_SQL_Gear_Corrected)
+
+```
+
+
+##Species Names Info
+```{r}
+##Bringing in species name information
+FIM_Species_Names=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/dataframes/FIM_Species_list_years1997_2017_BW.csv")
+
+colnames(FIM_Species_Names)<-c("X","NODCCODE","spp_code","Scientificname","Commonname","spp_code_old","No_Records","Total_Abundance","Phylum","Class","Order","Family")
+
+FIM_Species_Names_corrected=FIM_Species_Names%>%
+  dplyr::mutate(Phylum=as.character(Phylum),Phylum=ifelse(Phylum=="Arthropoda ","Arthropoda",Phylum),Phylum=as.factor(Phylum))%>%
+  dplyr::mutate(Class=as.character(Class),Class=ifelse(Class=="Actinopterygii ","Actinopterygii",ifelse(Class=="Chondrichthyes " ,"Chondrichthyes",ifelse(Class=="Malacostraca ","Malacostraca",ifelse(Class=="Reptilia ","Reptilia",ifelse(Class=="Teleostei","Teleoste",ifelse(Class=="\nMalacostraca","Malacostraca",Class)))))),Class=as.factor(Class))
+
+
+FIM_Species_Names_corrected=FIM_Species_Names_corrected%>%
+  filter(NODCCODE=="6189021301" | NODCCODE=="6182010101")
+
+```
+
+
+##Abundance info
+```{r}
+#Species Abundance information
+FIM_SQL_Species_N=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/FWRI_FIM_SQL_Database_ALL/Species_abundance_queried09112018.csv")
+
+# summary(FIM_SQL_Species_N)
+names(FIM_SQL_Species_N)
+head(FIM_SQL_Species_N)
+
+#Species length information
+lengths=read.csv("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/FWRI_FIM_SQL_Database_ALL/Species_lengths_queried09112018.csv")
+
+head(lengths)
+
+
+#Joining references and abundance data to names
+FIM_SQL_Species_N_usable_named=plyr::join(FIM_SQL_Species_N,FIM_Species_Names,by="NODCCODE",type = "left")
+
+#Joining references and abundance and names data to effort info
+FIM_SQL_Species_N_usable_named_effort=plyr::join(FIM_SQL_Species_N_usable_named,FIM_SQL_Gear_Corrected[c(1:2,7)],by="Reference",type = "left")
+
+names(FIM_SQL_Gear_Corrected)
+names(FIM_SQL_Species_N_usable_named_effort)
+
+
+
+```
+
+
+#quick fix of info
+```{r}
+#figuring out the number of codes
+# levels(as.factor(FIM_SQL_Species_N$NODCCODE))
+
+FIM_SQL_Species_N_usable_named_effort_corrected=FIM_SQL_Species_N_usable_named_effort%>%
+  filter(is.na(Number)==FALSE)%>%
+  filter(NODCCODE!=0)%>%
+  filter(NODCCODE!=1.111e+09)%>%
+  filter(NODCCODE!=5.124e+09)%>%
+  filter(NODCCODE!=8.737e+09)%>%
+  filter(NODCCODE!=8.747e+09)%>%
+  filter(NODCCODE!=8.777e+09)%>%
+  filter(NODCCODE!=8.855e+09)%>%
+  filter(NODCCODE!=9.998e+09)%>%
+  filter(NODCCODE!=9.999e+09)%>%
+  dplyr::mutate(Phylum=as.character(Phylum),Phylum=ifelse(Phylum=="Arthropoda ","Arthropoda",Phylum),Phylum=as.factor(Phylum))%>%
+  dplyr::mutate(Class=as.character(Class),Class=ifelse(Class=="Actinopterygii ","Actinopterygii",ifelse(Class=="Chondrichthyes " ,"Chondrichthyes",ifelse(Class=="Malacostraca ","Malacostraca",ifelse(Class=="Reptilia ","Reptilia",ifelse(Class=="Teleostei ","Actinopterygii",ifelse(Class=="\nMalacostraca","Malacostraca",ifelse(Class=="Osteichthyes","Actinopterygii",Class))))))),Class=as.factor(Class))%>%
+  mutate(Number_100sqm=Number/Effort_Correction,Number_sqkm=Number_100sqm*(100/1e-4),Number_Hectare=(Number_100sqm*100)/0.01)
+
+names(FIM_SQL_Species_N_usable_named_effort_corrected)
+summary(FIM_SQL_Species_N_usable_named_effort_corrected)
+
+##Joining o lengths=
+FIM_SQL_Species_N_usable_named_effort_corrected_lengths=plyr::join(FIM_SQL_Species_N_usable_named_effort_corrected,lengths[-5],by=c("Reference","Species_record_id"),type = "left")
+
+## Adding "fishery" recruitment info
+FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo=FIM_SQL_Species_N_usable_named_effort_corrected_lengths%>%
+  mutate(Recruitment_Length=ifelse(Commonname=="Florida Stone Crab",7,ifelse(Commonname=="Spiny Lobster",8,NA)))
+
+
+names(FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo)
+
+FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo_summary=FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo%>%
+  filter(is.na(Recruitment_Length)!=TRUE)%>%
+  dplyr::select(Reference,NODCCODE,Scientificname,Commonname,Number_Hectare,Species_record_id,Length_record_id,Length,Recruitment_Length)%>%
+  group_by(Reference,Species_record_id,NODCCODE,Scientificname,Commonname)%>%
+  dplyr::summarize(Length_Mean=mean(Length,na.rm=TRUE),Total_Counted=n(),Recruited=sum(Length>Recruitment_Length),Juveniles=sum(Length <= Recruitment_Length),Prop_Recruits=Recruited/Total_Counted,Prop_Juveniles=Juveniles/Total_Counted)
+    
+
+head(FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo_summary)
+names(FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo_summary)
+
+
+```
+
+#Merging count data with juvenile lengths
+```{r}
+rm(Effort);
+# rm(FIM_reference)
+rm(FIM_Species_Names)
+rm(FIM_Species_Names_corrected)
+rm(lengths)
+
+names(FIM_SQL_Species_N_usable_named_effort_corrected)
+
+#Joining recruit information 
+FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies=FIM_SQL_Species_N_usable_named_effort_corrected%>%
+  filter(Commonname=="Florida Stone Crab" | Commonname=="Spiny Lobster")
+
+FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies=join( FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies, FIM_SQL_Species_N_usable_named_effort_corrected_lengths_recruitinfo_summary,by=c("Reference","Species_record_id","NODCCODE"),type="left")
+
+dim(FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies)
+names(FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies)
+
+FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies=FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies%>%
+  mutate(Nursery_N_100sqm=Prop_Juveniles*Number_100sqm,Adults_N_100sqm=Prop_Recruits*Number_100sqm)
+
+summary(FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies)
+
+
+```
+
+
+
+
+#Making a final dataframe for nursery species
+```{r}
+names(FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies)
+
+FIM_Final_Juvenile_Nursery_Species=FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies%>%
+  dplyr::group_by(Reference,NODCCODE,Scientificname,Commonname,Gear)%>%
+  dplyr::summarize(Nursery_N_100sqm=sum(Nursery_N_100sqm,na.rm=TRUE))%>%
+  dplyr::ungroup()%>%
+  dplyr::select(Reference,Gear,Commonname,Nursery_N_100sqm)%>%
+  tidyr::spread(key=Commonname,value=Nursery_N_100sqm,fill=0)%>%
+  dplyr::mutate(Stage="Juvenile")
+
+names(FIM_Final_Juvenile_Nursery_Species)<-c("Reference","Florida.Stone.Crab","Spiny.Lobster","Stage")
+
+FIM_Final_Juvenile_Nursery_Species%>%
+  dplyr::summarize(Spiny=sum(Spiny.Lobster>0),StoneCrab=sum(Florida.Stone.Crab>0))
+
+summary(FIM_Final_Juvenile_Nursery_Species)
+
+FIM_Final_Adult_Nursery_Species=FIM_SQL_Species_N_usable_named_effort_corrected_nurseryspecies%>%
+  dplyr::group_by(Reference,NODCCODE,Scientificname,Commonname,Gear)%>%
+  dplyr::summarize(Adults_N_100sqm=sum(Adults_N_100sqm,na.rm=TRUE))%>%
+  ungroup%>%
+  dplyr::select(Reference,Commonname,Gear,Adults_N_100sqm)%>%
+  tidyr::spread(key=Commonname,value=Adults_N_100sqm,fill=0)%>%
+    mutate(Stage="Adult")
+
+names(FIM_Final_Adult_Nursery_Species)<-c("Reference","Florida.Stone.Crab","Spiny.Lobster","Stage")
+
+FIM_Final_Adult_Nursery_Species%>%
+  dplyr::summarize(Spiny=sum(Spiny.Lobster>0),StoneCrab=sum(Florida.Stone.Crab>0))
+
+
+
+
+write.csv(FIM_Final_Juvenile_Nursery_Species,file="data/FIM_Final_Juvenile_SpinyLobster_StoneCrab_1997_2017.csv")
+
+write.csv(FIM_Final_Adult_Nursery_Species,file="data/FIM_Final_Adult_SpinyLobster_StoneCrab_1997_2017.csv")
+
+
+
+```
+

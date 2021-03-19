@@ -1,0 +1,355 @@
+---
+title: "Ch3_Combining_Rescaling_BEV"
+author: "Jenn_McHenry"
+date: "2/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(virtualspecies)
+library(rgeos)
+library(spatialEco)
+library(climateStability)
+library(RStoolbox)
+library(sdmvspecies)
+
+
+
+```
+
+#loading final biodiverity data
+```{r}
+
+load("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter2_ALL_MODEL_PREDICTIONS_FOR_PLOTTING_AND_ANALYSIS_SIMPLIFIED_Oct2020.RData")
+
+#Confirmed Seagrass Areas
+Confirmed=mapped_predictions_seagrass_faunal_biodiversity_current_SLR_stack$CA
+
+#Unconfirmed Seagrass Areas
+Unconfirmed=mapped_predictions_seagrass_faunal_biodiversity_current_SLR_stack$RA
+
+rm(list= ls()[!(ls() %in% c("Atlantic_Mask", "Dry_Tortugas_Mask","fl_shoreline","Unconfirmed","Confirmed"))])
+
+
+```
+
+
+#prepping datasets for overlay
+```{r}
+#Loading data
+#developing a seagrass bed and PRA mask
+BottomVegCover=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Seagrass_Cover_MeanAnnual_Current_Corrected_CorExp.tif")
+names(BottomVegCover)<-c("BottomVegCover")
+# BottomVegCover[is.na(BottomVegCover)==TRUE]<-0
+# raster::plot(BottomVegCover,colNA="blue")
+
+Total_Predicted_Seagrass_PA=BottomVegCover
+Total_Predicted_Seagrass_PA[Total_Predicted_Seagrass_PA<=5]<-0
+Total_Predicted_Seagrass_PA[Total_Predicted_Seagrass_PA>5]<-1
+
+Total_Predicted_Seagrass=Total_Predicted_Seagrass_PA
+Total_Predicted_Seagrass[Total_Predicted_Seagrass==0]<-NA
+Total_Predicted_Seagrass[Total_Predicted_Seagrass==1]<-0
+
+# Total_Predicted_Seagrass_Poly<-rasterToPolygons(x=Total_Predicted_Seagrass, na.rm=TRUE, digits=12, dissolve=TRUE)
+
+
+#Seines
+Seines_SAV<-raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Hill0_Seines_MeanAnnual_SAV_Current.tif")
+Seines_NOSAV<-raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Hill0_Seines_MeanAnnual_NOSAV_Current.tif")
+
+
+
+#Otter trawls
+Otters_SAV<-raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Hill0_Otters_MeanAnnual_SAV_Current.tif")
+Otters_NOSAV<-raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Hill0_Otters_MeanAnnual_NOSAV_Current.tif")
+
+
+#figuring out the mean at the depth of overlap
+Depth<-raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/data_output/Depth.tif")
+
+#making depth range layers
+shallow<-Depth
+shallow[shallow >= 0]<-NA
+shallow[shallow < -2]<-NA
+plot(shallow)
+
+deep<-Depth
+deep[deep >= -2]<-NA
+deep[deep < -4]<-NA
+plot(deep)
+
+
+#making a depth overlap layer
+coastal_depths<-mask(Depth,mask=Total_Predicted_Seagrass_PA)
+
+depth_overlap<-coastal_depths
+depth_overlap[depth_overlap > -1.6]<-NA
+depth_overlap[depth_overlap < -2.0]<-NA
+
+plot(depth_overlap)
+
+
+#figuring out the means at the depth of overlap
+Seines_Overlap<-mask(Seines_SAV,depth_overlap)
+plot(Seines_Overlap)
+cellStats(Seines_Overlap,mean)
+
+
+Otters_Overlap<-mask(Otters_SAV,depth_overlap)
+plot(Otters_Overlap)
+cellStats(Otters_Overlap,mean)
+
+#Taking a correlation between the two within the overlappng depth range
+overlap_stack_df=raster::as.data.frame(stack(Seines_Overlap,Otters_Overlap),row.names = TRUE)
+names(overlap_stack_df)
+stats::cor(overlap_stack_df$Hill0_Seines_MeanAnnual_SAV_Current,overlap_stack_df$Hill0_Otters_MeanAnnual_SAV_Current,method = "pearson",use ="pairwise.complete.obs" )
+
+# R=0.23 in the depth of overlap
+
+overlap_conversion_lm=lm(Hill0_Otters_MeanAnnual_SAV_Current~Hill0_Seines_MeanAnnual_SAV_Current,data=overlap_stack_df)
+summary(overlap_conversion_lm)
+
+overlap_conversion_lm$coefficients
+
+#Taking a correlation between the two overall
+stack_df=raster::as.data.frame(stack(Seines_SAV,Otters_SAV),row.names = TRUE)
+names(stack_df)
+stats::cor(stack_df$Hill0_Seines_MeanAnnual_SAV_Current,stack_df$Hill0_Otters_MeanAnnual_SAV_Current,method = "pearson",use ="pairwise.complete.obs" )
+
+
+overall_conversion_lm=lm(Hill0_Otters_MeanAnnual_SAV_Current~Hill0_Seines_MeanAnnual_SAV_Current,data=stack_df)
+summary(overall_conversion_lm)
+
+overall_conversion_lm$coefficients
+
+# R=0.87 in the depth of overlap
+
+
+#Raw Seine EV Estimates
+EV_Seines=Seines_SAV - Seines_NOSAV
+
+cellStats(EV_Seines,mean)
+
+#Raw Otter Trawl EV Estimates
+
+EV_Otters=Otters_SAV - Otters_NOSAV
+
+cellStats(EV_Otters,mean)
+
+# Correcting the Seine EV estimates
+#correcting the seine layer
+Seines_SAV_Corrected<-(Seines_SAV*1.750369 ) + 1.098987  
+Seines_NOSAV_Corrected<- (Seines_NOSAV*1.750369 ) + 1.098987  
+
+EV_Seines_Corrected<-Seines_SAV_Corrected-Seines_NOSAV_Corrected
+
+
+# #Masking the EV maps to their depth ranges
+EV_Seines_Mask_Zeroed=mask(EV_Seines,mask=shallow,updatevalue=0)
+plot(EV_Seines_Mask_Zeroed)
+cellStats(EV_Seines_Mask_Zeroed,mean)
+
+EV_Seines_Mask_Zeroed_Corrected=mask(EV_Seines_Corrected,mask=shallow,updatevalue=0)
+plot(EV_Seines_Mask_Zeroed_Corrected)
+cellStats(EV_Seines_Mask_Zeroed_Corrected,mean)
+
+EV_Otters_Mask_Zeroed=mask(EV_Otters,mask=deep,updatevalue=0)
+plot(EV_Otters_Mask_Zeroed)
+cellStats(EV_Otters_Mask_Zeroed,mean)
+
+EV_Seines_Mask_NAd=mask(EV_Seines,mask=shallow,updatevalue=NA)
+plot(EV_Seines_Mask_NAd)
+cellStats(EV_Seines_Mask_NAd,mean)
+
+EV_Seines_Mask_NAd_Corrected=mask(EV_Seines_Corrected,mask=shallow,updatevalue=NA)
+plot(EV_Seines_Mask_NAd_Corrected)
+cellStats(EV_Seines_Mask_NAd_Corrected,mean)
+
+EV_Otters_Mask_NAd=mask(EV_Otters,mask=deep,updatevalue=NA)
+plot(EV_Otters_Mask_NAd)
+cellStats(EV_Otters_Mask_NAd,mean)
+
+
+#playing around with normalization 
+#centering subtracts the mean from raster, placing the mean at zero. But maintaining the original range of values. Units are still in the number of species. 
+EV_Seines_centered=normImage(EV_Seines_Mask_NAd,norm=FALSE)
+plot(EV_Seines_centered)
+
+EV_Seines_centered_Corrected=normImage(EV_Seines_Mask_NAd_Corrected,norm=FALSE)
+plot(EV_Seines_centered_Corrected)
+
+
+EV_Otters_centered=normImage(EV_Otters_Mask_NAd,norm=FALSE)
+plot(EV_Otters_centered)
+summary(EV_Otters_centered)
+
+#centering and normalizing substracts the mean from the raster, placing the mean at the center. Then divides by the standard deviation, such that the values equate to the number of standard deviations above the mean. 
+EV_Seines_centered_norm=normImage(EV_Seines_Mask_NAd,norm=TRUE)
+plot(EV_Seines_centered_norm)
+
+EV_Seines_centered_norm_Corrected=normImage(EV_Seines_Mask_NAd_Corrected,norm=TRUE)
+plot(EV_Seines_centered_norm_Corrected)
+
+EV_Otters_centered_norm=normImage(EV_Otters_Mask_NAd,norm=TRUE)
+plot(EV_Otters_centered_norm)
+summary(EV_Otters_centered)
+
+
+#Overlaying Datasets 
+#Raw Overlay 
+BEV_simple_overlay=overlay(Total_Predicted_Seagrass[[1]],EV_Otters_Mask_Zeroed[[1]],EV_Seines_Mask_Zeroed[[1]],fun=function(a,b,c){return(a + b + c)})
+names(BEV_simple_overlay)<-c("Raw EV")
+
+plot(BEV_simple_overlay)
+
+
+#Raw Overlay where Richness is corrected by the relationship between seine and otter trawl predictions
+BEV_simple_overlay_CorrectedRichness=overlay(Total_Predicted_Seagrass[[1]],EV_Otters_Mask_Zeroed[[1]],EV_Seines_Mask_Zeroed_Corrected[[1]],fun=function(a,b,c){return(a + b + c)})
+names(BEV_simple_overlay_CorrectedRichness)<-c("Raw EV Corrected")
+
+plot(BEV_simple_overlay_CorrectedRichness)
+
+
+# Rescaled Simple Summation Overlay
+BEV_rescaled_overlay=rescale0to1(BEV_simple_overlay)
+names(BEV_rescaled_overlay)<-c("Rescaled Raw EV")
+
+plot(BEV_rescaled_overlay)
+
+# Rescaled Summation Overlay  where seine richness is corrected by the linear relationship between seine and tral predictions
+BEV_rescaled_overlay_CorrectedRichness=rescale0to1(BEV_simple_overlay_CorrectedRichness)
+names(BEV_rescaled_overlay_CorrectedRichness)<-c("Rescaled Raw EV Corrected")
+
+plot(BEV_rescaled_overlay_CorrectedRichness)
+
+
+
+
+#Centered Overlay 
+EV_Otters_centered[is.na(EV_Otters_centered)==TRUE]<-0
+EV_Seines_centered[is.na(EV_Seines_centered)==TRUE]<-0
+EV_Seines_centered_Corrected[is.na(EV_Seines_centered_Corrected)==TRUE]<-0
+
+BEV_centered_overlay=overlay(Total_Predicted_Seagrass[[1]],EV_Otters_centered[[1]],EV_Seines_centered[[1]],fun=function(a,b,c){return(a + b + c)})
+
+names(BEV_centered_overlay)<-c("EV Centered")
+plot(BEV_centered_overlay)
+
+#Using Corrected Richness
+BEV_centered_overlay_Corrected=overlay(Total_Predicted_Seagrass[[1]],EV_Otters_centered[[1]],EV_Seines_centered_Corrected[[1]],fun=function(a,b,c){return(a + b + c)})
+
+names(BEV_centered_overlay_Corrected)<-c("EV Centered Corrected")
+plot(BEV_centered_overlay_Corrected)
+
+
+
+#Centered and Normalized Overlay 
+EV_Otters_centered_norm[is.na(EV_Otters_centered_norm)==TRUE]<-0
+EV_Seines_centered_norm[is.na(EV_Seines_centered_norm)==TRUE]<-0
+EV_Seines_centered_norm_Corrected[is.na(EV_Seines_centered_norm_Corrected)==TRUE]<-0
+
+BEV_centered_normalized_overlay=overlay(Total_Predicted_Seagrass[[1]],EV_Otters_centered_norm[[1]],EV_Seines_centered_norm[[1]],fun=function(a,b,c){return(a + b + c)})
+
+names(BEV_centered_normalized_overlay)<-c("EV Centered Normalized")
+plot(BEV_centered_normalized_overlay)
+
+#Corrected
+BEV_centered_normalized_overlay_Corrected=overlay(Total_Predicted_Seagrass[[1]],EV_Otters_centered_norm[[1]],EV_Seines_centered_norm_Corrected[[1]],fun=function(a,b,c){return(a + b + c)})
+
+names(BEV_centered_normalized_overlay_Corrected)<-c("EV Centered Normalized Corrected")
+plot(BEV_centered_normalized_overlay_Corrected)
+
+# save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_Rescaling_BEV_Maps.RData")
+```
+ 
+#plotting
+```{r}
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+# install.packages("spDataLarge", repos = "https://nowosad.github.io/drat/", type = "source")
+library(spDataLarge)
+library(tmap)    # for static and interactive maps
+library(leaflet) # for interactive maps
+library(ggplot2) 
+
+# library(shiny)
+# library(htmltools)
+# tmaptools::palette_explorer()
+  
+
+GOM_shoreline=sf::read_sf("data/GOM_Shoreline_utm.shp")
+GOM_shoreline_WG84<-st_transform(GOM_shoreline, 4326)
+
+
+FL_Map=tm_shape(GOM_shoreline_WG84,bbox=extent(Total_Predicted_Seagrass)) +
+  # tm_fill() +
+  tm_borders()+
+  # tm_lines()+
+  # tm_polygons()+
+  tm_layout(legend.position = c("left","bottom"),inner.margins = 0)
+  
+
+#Raw BEV
+BEV_plot=FL_Map +tm_shape(BEV_simple_overlay) + tm_raster(alpha = 1 ,breaks=c(-20,-15,-10,-5,-1,0,1,5,10,15,20),title="Raw BEV")
+
+#Raw Corrected BEV
+BEV_corrected_plot=FL_Map +tm_shape(BEV_simple_overlay_CorrectedRichness) + tm_raster(alpha = 1,breaks=c(-20,-15,-10,-5,-1,0,1,5,10,15,20),title="Corrected Raw BEV")
+
+BEV_plot
+
+#Rescaled Corrected BEV
+BEV_corrected_rescaled_plot=FL_Map + tm_shape(BEV_rescaled_overlay_CorrectedRichness) + tm_raster(alpha = 1,palette="Spectral",title="Corrected Rescaled BEV")
+
+#Centered BEV
+BEV_centered_plot=FL_Map +tm_shape(BEV_centered_overlay) + tm_raster(alpha = 1, breaks=c(-20,-15,-10,-5,-1,0,1,5,10,15,20),title="Centered BEV")
+
+#Centered Corrected BEV
+BEV_centered_corrected_plot=FL_Map +tm_shape(BEV_centered_overlay_Corrected) + tm_raster(alpha = 1,breaks=c(-15,-10,-5,-1,0,1,5,10,15,20), title="Centered Corrected BEV")
+
+#Normalized & Centered BEV
+BEV_standardized_plot=FL_Map + tm_shape(BEV_centered_normalized_overlay) + tm_raster(alpha = 1, title="Standardized BEV")
+
+#Normalized & Centered & Corrected BEV
+BEV_standardized_corrected_plot=FL_Map +tm_shape(BEV_centered_normalized_overlay_Corrected) + tm_raster(alpha = 1, title="Standardized Corrected BEV")
+
+# ALL=tmap_arrange(BEV_plot,BEV_rescaled_plot)
+
+# save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_Rescaling_BEV_Maps.RData")
+```
+
+# Clipping to Confirmed vs Unconfirmed Seagrass Beds & 
+#Exporting Value Maps for Analysis
+```{r}
+
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_Rescaling_BEV_Maps.RData")
+
+rm(list= ls()[!(ls() %in% c("Atlantic_Mask", "Dry_Tortugas_Mask","Unconfirmed","Confirmed","BEV_centered_normalized_overlay_Corrected", "FL_Map"))])
+
+
+BEV_Zscores_Confirmed=mask(BEV_centered_normalized_overlay_Corrected,mask=Confirmed,updatevalue=NA)
+# cellStats(BEV_centered_normalized_overlay_Corrected,max)
+
+
+BEV_Zscores_Confirmed_plot=FL_Map +tm_shape(BEV_Zscores_Confirmed) + tm_raster(alpha = 1, title="BEV Z-Scores \nConfirmed Seagrass")
+
+
+BEV_Zscores_PRAs=mask(BEV_centered_normalized_overlay_Corrected,mask=Unconfirmed,updatevalue=NA)
+# cellStats(BEV_centered_normalized_overlay_Corrected,max)
+
+BEV_Zscores_PRAs_plot=FL_Map +tm_shape(BEV_Zscores_PRAs) + tm_raster(alpha = 1, title="BEV Z-Scores \nPotential Restoration Areas")
+
+
+
+writeRaster(BEV_Zscores_Confirmed,file="model_output/ES-Model-Outputs/BEV_Zscores_Confirmed.tif",format="GTiff",overwrite=TRUE)
+
+writeRaster(BEV_Zscores_PRAs,file="model_output/ES-Model-Outputs/BEV_Zscores_PRAs.tif",format="GTiff",overwrite=TRUE)
+
+
+
+```
+
+```

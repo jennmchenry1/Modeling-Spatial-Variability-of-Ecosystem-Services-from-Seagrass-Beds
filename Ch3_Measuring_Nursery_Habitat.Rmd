@@ -1,0 +1,490 @@
+---
+title: "Ch3_Measuring_Nursery_Habitat"
+author: "Jenn_McHenry"
+date: "2/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(raster)
+library(gratia)
+library(climateStability)
+library(MCDA)
+library(dplyr)
+library(sdmvspecies)
+
+if (!require(devtools)) install.packages('devtools')
+devtools::install_github("giswqs/whiteboxR")
+
+# http://www.samuelbosch.com/2018/02/speeding-up-mean-and-standard-deviation.html
+rasterstack_meansd_fast <- function(x) {
+  s0 <- raster::nlayers(x)
+  s1 <- raster::raster(x, layer=1)
+  s2 <- s1^2
+  for(ri in 2:s0) {
+    r <- raster::raster(x, layer=ri)
+    s1 <- s1 + r
+    s2 <- s2 + r^2
+  }
+  list(mean=s1/s0, sd=sqrt((s0 * s2 - s1 * s1)/(s0 * (s0 - 1))))
+}
+
+
+```
+
+#Loading Seagrass Distrubtion Data
+```{r}
+BottomVegCover=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/model_output/August_2020_seagrassmodel_predictions/Annual_Predictions/Seagrass_Cover_MeanAnnual_Current_Corrected_CorExp.tif")
+names(BottomVegCover)<-c("BottomVegCover")
+# BottomVegCover[is.na(BottomVegCover)==TRUE]<-0
+raster::plot(BottomVegCover,colNA="blue")
+
+Total_Predicted_Seagrass=BottomVegCover
+Total_Predicted_Seagrass[Total_Predicted_Seagrass<=5]<-0
+Total_Predicted_Seagrass[Total_Predicted_Seagrass>5]<-1
+Total_Predicted_Seagrass[Total_Predicted_Seagrass==0]<-NA
+
+plot(Total_Predicted_Seagrass,colNA="blue")
+```
+
+#Loading the final probabiliity nursery habiat models 
+```{r}
+
+# Spotted Seatrout
+spotted_seatrout=readRDS("model_versions/Spotted_Seatrout_binomial_gam.rds")
+
+# par(mfrow=c(2,3));plot.gam(spotted_seatrout,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+# 
+# draw(spotted_seatrout)
+
+#Gray Snapper
+gray_snapper=readRDS("model_versions/Gray_Snapper_binomial_gam.rds")
+
+# par(mfrow=c(2,3));plot.gam(gray_snapper,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+# 
+# draw(gray_snapper)
+
+# Lane Snapper
+lane_snapper=readRDS("model_versions/Lane_Snapper_binomial_gam.rds")
+
+# par(mfrow=c(2,3));plot.gam(lane_snapper,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+# draw(lane_snapper)
+
+#Pink Shrimp
+pink_shrimp=readRDS("model_versions/Pink_Shrimp_binomial_gam.rds")
+
+# par(mfrow=c(2,3));plot.gam(pink_shrimp,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+# draw(pink_shrimp)
+
+#White Grunt
+white_grunt=readRDS("model_versions/WhiteGrunt_binomial_gam.rds")
+
+# par(mfrow=c(2,3));plot.gam(white_grunt,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+
+draw(white_grunt)
+
+#Sheepshead
+sheepshead=readRDS("model_versions/Sheepshead_binomial_gam.rds")
+
+# par(mfrow=c(2,3));plot.gam(sheepshead,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob, all.term=TRUE)
+# 
+# draw(sheepshead)
+
+```
+
+#Loading nursery prediction rasters
+```{r}
+
+#Spring (3-5) , Summer (6-8), Fall(9-11), Winter(12-2)
+
+######GRAY SNAPPER
+#determining what seasons to include
+# draw(gray_snapper)
+#gray snapper (June to September)
+gray_snapper_list=list.files("model_output/nursery_monthly/",pattern = "gray_snapper",full.names = TRUE)
+# 
+gray_snapper_monthly_rs=stack(gray_snapper_list[9:12])
+gray_snapper_monthly_rs=mask(gray_snapper_monthly_rs,mask=Total_Predicted_Seagrass)
+
+gray_snapper_rs_annual_clim=rasterstack_meansd_fast(gray_snapper_monthly_rs)
+
+gray_snapper_rs_annual_clim$se=gray_snapper_rs_annual_clim$sd/4
+
+plot(gray_snapper_rs_annual_clim$mean)
+plot(gray_snapper_rs_annual_clim$se)
+
+writeRaster(gray_snapper_rs_annual_clim$mean,file="model_output/gray_snapper_probability_annual_clim.tif",overwrite=TRUE)
+
+# gray_snapperPA=gray_snapper_rs_mean$mean
+# gray_snapperPA[gray_snapperPA<=0.05]<-0
+# gray_snapperPA[gray_snapperPA>0.05]<-1
+
+######White Grunt 
+#determining what seasons to include
+# draw(white_grunt)
+#white grunt (June to September)
+white_grunt_list=list.files("model_output/nursery_monthly/",pattern = "white_grunt",full.names = TRUE)
+# 
+white_grunt_monthly_rs=stack(white_grunt_list[9:12])
+white_grunt_monthly_rs=mask(white_grunt_monthly_rs,mask=Total_Predicted_Seagrass)
+
+white_grunt_rs_annual_clim=rasterstack_meansd_fast(white_grunt_monthly_rs)
+
+white_grunt_rs_annual_clim$se=white_grunt_rs_annual_clim$sd/4
+
+plot(white_grunt_rs_annual_clim$mean) # For some reason the probabilities are really low..
+plot(white_grunt_rs_annual_clim$se)
+
+writeRaster(white_grunt_rs_annual_clim$mean,file="model_output/white_grunt_probability_annual_clim.tif",overwrite=TRUE)
+
+
+######Spotted Seatrout 
+#determining what seasons to include
+# draw(spotted_seatrout)
+#spotted seatrout (June to September)
+spotted_seatrout_list=list.files("model_output/nursery_monthly/",pattern = "spotted_seatrout",full.names = TRUE)
+#
+spotted_seatrout_monthly_rs=stack(spotted_seatrout_list[c(9:12,21:24,33:36,45:48)])
+spotted_seatrout_monthly_rs=mask(spotted_seatrout_monthly_rs,mask=Total_Predicted_Seagrass)
+
+spotted_seatrout_monthly_clim <- stackApply(spotted_seatrout_monthly_rs, indices=c(6,7,8,9,6,7,8,9,6,7,8,9,6,7,8,9), fun = mean)
+
+spotted_seatrout_rs_annual_clim=rasterstack_meansd_fast(spotted_seatrout_monthly_clim)
+# 
+spotted_seatrout_rs_annual_clim$se=spotted_seatrout_rs_annual_clim$sd/12
+
+plot(spotted_seatrout_rs_annual_clim$mean) # For some reason the probabilities are really low..
+plot(spotted_seatrout_rs_annual_clim$se)
+# 
+writeRaster(spotted_seatrout_rs_annual_clim$mean,file="model_output/spotted_seatrout_probability_annual_clim.tif",overwrite=TRUE)
+
+
+# 
+# 
+######LANE SNAPPER
+#determining what seasons to include
+# draw(lane_snapper)
+#lane snapper (June - September)
+lane_snapper_list=list.files("model_output/nursery_monthly/",pattern = "lane_snapper",full.names = TRUE)
+#
+lane_snapper_monthly_rs=stack(lane_snapper_list)
+lane_snapper_monthly_rs=mask(lane_snapper_monthly_rs,mask=Total_Predicted_Seagrass)
+lane_snapper_rs_annual_clim=rasterstack_meansd_fast(lane_snapper_monthly_rs)
+# 
+lane_snapper_rs_annual_clim$se=lane_snapper_rs_annual_clim$sd/4
+# 
+plot(lane_snapper_rs_annual_clim$mean) 
+plot(lane_snapper_rs_annual_clim$se)
+
+writeRaster(lane_snapper_rs_annual_clim$mean,file="model_output/lane_snapper_probability_annual_clim.tif",overwrite=TRUE)
+
+
+######Sheepshead
+#determining what seasons to include
+# draw(sheepshead)
+#Sheepshead (June - September)
+sheepshead_list=list.files("model_output/nursery_monthly/",pattern = "sheepshead",full.names = TRUE)
+#
+# sheepshead_monthly_rs=stack(sheepshead_list[c(9:12,21:24,33:36,45:48)])
+sheepshead_monthly_rs=stack(sheepshead_list[c(9:11,19:21,30:32,41:43)])
+# sheepshead_monthly_rs=stack(sheepshead_list)
+
+sheepshead_monthly_rs=mask(sheepshead_monthly_rs,mask=Total_Predicted_Seagrass)
+
+# sheepshead_monthly_clim <- stackApply(sheepshead_monthly_rs, indices=c(6,7,8,9,6,7,8,9,6,7,8,9,6,7,8,9), fun = mean)
+sheepshead_monthly_clim <- stackApply(sheepshead_monthly_rs, indices=c(6,8,9,6,8,9,6,8,9,6,8,9), fun = mean)
+
+# sheepshead_monthly_clim <- stackApply(sheepshead_monthly_rs, indices=c(1,10,11,12,2,3,4,5,6,8,9,1,10,11,2,3,4,5,6,8,9,1,10,11,12,2,3,4,5,6,8,9,1,10,11,12,2,3,4,5,6,8,9), fun = mean)
+
+
+sheepshead_rs_annual_clim=rasterstack_meansd_fast(sheepshead_monthly_clim)
+# 
+sheepshead_rs_annual_clim$se=sheepshead_rs_annual_clim$sd/3
+# 
+plot(sheepshead_rs_annual_clim$mean) # For some reason the probabilities are really low...Sheepshead are more prevelant in Seines, so maybe its no the random effect.
+plot(sheepshead_rs_annual_clim$se)
+
+writeRaster(sheepshead_rs_annual_clim$mean,file="model_output/sheepshead_probability.tif",overwrite=TRUE)
+#
+# 
+######Pink Shrimp
+#determining what seasons to include
+# draw(pink_shrimp)
+#Pink shrimp (June - September)
+pink_shrimp_list=list.files("model_output/nursery_monthly/",pattern = "pink_shrimp",full.names = TRUE)
+#
+pink_shrimp_monthly_rs=stack(pink_shrimp_list[c(9:12,21:24,33:36,45:48)])
+
+pink_shrimp_monthly_rs=mask(pink_shrimp_monthly_rs,mask=Total_Predicted_Seagrass)
+
+pink_shrimp_monthly_clim <- stackApply(pink_shrimp_monthly_rs, indices=c(6,7,8,9,6,7,8,9,6,7,8,9,6,7,8,9), fun = mean)
+
+
+pink_shrimp_rs_annual_clim=rasterstack_meansd_fast(pink_shrimp_monthly_rs)
+
+
+# 
+pink_shrimp_rs_annual_clim$se=pink_shrimp_rs_annual_clim$sd/4
+
+plot(pink_shrimp_rs_annual_clim$mean) # For some reason the probabilities are really low..
+plot(pink_shrimp_rs_annual_clim$se)
+
+
+
+pink_shrimp_rs_annual_clim_fixed=pink_shrimp_rs_annual_clim$mean
+pink_shrimp_rs_annual_clim_fixed[is.na(pink_shrimp_rs_annual_clim_fixed)==TRUE]<-0
+
+pink_shrimp_rs_annual_clim_fixed=mask(pink_shrimp_rs_annual_clim_fixed,mask=Total_Predicted_Seagrass)
+pink_shrimp_rs_annual_clim$mean<-pink_shrimp_rs_annual_clim_fixed
+
+writeRaster(pink_shrimp_rs_annual_clim$mean,file="model_output/pink_shrimp_probability_annual_clim.tif",overwrite=TRUE)
+
+  
+# save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_AnnualPredictions_March2021.RData")
+
+
+```
+
+
+#checking that the predictions match for pink shrimp
+```{r}
+
+data_shp<-as.data.frame(pink_shrimp$model)%>%
+  filter(month==8 & year==2017)%>%
+  mutate(Gear_Type=0)
+coordinates(data_shp)<- ~Longitude+Latitude
+
+draw(pink_shrimp)
+
+test_rs<-raster("model_output/nursery_monthly/pink_shrimp_2017_8.tif")
+
+test_rs[test_rs<=0.01]<-0
+# 
+pink_shrimp_2017_8=raster::extract(x = test_rs,y=data_shp)
+
+data_shp_extracted_df=cbind(data_shp,as.data.frame(pink_shrimp_2017_8))
+data_shp_extracted_df=as.data.frame(data_shp_extracted_df)
+
+
+data_shp_extracted_df$test_predict_reponse=mgcv::predict.gam(object = pink_shrimp, newdata=data_shp_extracted_df, type="response", se.fit=FALSE)
+
+
+data_shp_extracted_df$test_predict_link=mgcv::predict.gam(object = pink_shrimp, newdata=data_shp_extracted_df, type="link", se.fit=FALSE)
+data_shp_extracted_df
+
+```
+
+
+#Rescaling outputs
+```{r}
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_AnnualPredictions_March2021.RData")
+
+gray_snapper_rs_mean_rescale=rescale0to1(gray_snapper_rs_annual_clim$mean)
+
+lane_snapper_rs_mean_rescale=rescale0to1(lane_snapper_rs_annual_clim$mean)
+
+white_grunt_rs_mean_rescale=rescale0to1(white_grunt_rs_annual_clim$mean)
+
+sheepshead_rs_mean_rescale=rescale0to1(sheepshead_rs_annual_clim$mean)
+
+spotted_seatrout_rs_mean_rescale=rescale0to1(spotted_seatrout_rs_annual_clim$mean)
+
+pink_shrimp_rs_mean_rescale=rescale0to1(pink_shrimp_rs_annual_clim$mean)
+
+
+nursery_habitat_stack<-stack(gray_snapper_rs_annual_clim$mean,
+                             lane_snapper_rs_annual_clim$mean,                                                 white_grunt_rs_annual_clim$mean,
+                             sheepshead_rs_annual_clim$mean,
+                             spotted_seatrout_rs_annual_clim$mean,
+                             pink_shrimp_rs_annual_clim$mean)
+
+nursery_habitat_stack=mask(nursery_habitat_stack,mask=Total_Predicted_Seagrass)
+
+names(nursery_habitat_stack)<-c("gray_snapper","lane_snapper","white_grunt","sheepshead","spotted_seatrout","pink_shrimp")
+```
+
+
+#Combining nursery habitat outputs a nursery habitat index
+```{r}
+
+#Summed Raw Probabilities
+total_NH<-stackApply(nursery_habitat_stack, 1, fun = sum,na.rm = TRUE)
+
+total_NH=mask(total_NH,Total_Predicted_Seagrass)
+
+#Summed Rescaled probabilities
+total_rescaled_NH<-rescale(total_NH)
+
+
+#Mean Raw Probabilities 
+mean_NH<-stackApply(nursery_habitat_stack,1, fun = mean)
+mean_NH=mask(mean_NH,Total_Predicted_Seagrass)
+
+#Mean Rescaled Probabilities
+mean_rescaled_NH<-rescale(mean_NH)
+
+
+names(nursery_habitat_stack)
+# [1] "gray_snapper"     "lane_snapper"    
+# [3] "white_grunt"      "sheepshead"      
+# [5] "spotted_seatrout" "pink_shrimp" 
+
+#SUMMED INDICES
+
+#Weighted by Commercial Value
+commercial_NH_weightedsum_value<-overlay(nursery_habitat_stack[[1]],nursery_habitat_stack[[2]],nursery_habitat_stack[[3]],nursery_habitat_stack[[4]],nursery_habitat_stack[[5]],nursery_habitat_stack[[6]], fun=function(a,b,c,d,e,f){return(a*626062+b*67023+c*365857+d*305886+e*119488+f*21567370)})  
+
+#Rescaled
+commercial_NH_weightedsum_valuerescale=rescale(commercial_NH_weightedsum_value)
+
+#Weighted by Recreational Value
+recreational_NH_weightedsum_value<-overlay(nursery_habitat_stack[[1]],nursery_habitat_stack[[2]],nursery_habitat_stack[[3]],nursery_habitat_stack[[4]],nursery_habitat_stack[[5]],nursery_habitat_stack[[6]], fun=function(a,b,c,d,e,f){return(a*11713903+b*761495+c*5393184 + d*5290811 + e*23896428+f*0)}) 
+
+#Rescaled
+recreational_NH_weightedsum_valuerescale=rescale(recreational_NH_weightedsum_value)
+
+#Weighted by the combined Commerical and Recreational value
+combined_NH_weightedsum_value<-overlay(nursery_habitat_stack[[1]],nursery_habitat_stack[[2]],nursery_habitat_stack[[3]],nursery_habitat_stack[[4]],nursery_habitat_stack[[5]],nursery_habitat_stack[[6]], fun=function(a,b,c,d,e,f){return(a*626062*11713903+b*761495*365857+c*5393184*365857+ d*5290811*305886 + e*23896428*119488+f*119488*1)}) 
+
+#Rescaled
+combined_NH_weightedsum_valuerescale=rescale(combined_NH_weightedsum_value)
+
+#MEAN INDICES
+#Weighted by the ranked recrational  value
+recreational_NH_weightedmean_value<-raster::weighted.mean(x=nursery_habitat_stack, w=c(2,6,3,4,5,1)) 
+
+#Rescaled
+recreational_NH_weightedmean_valuerescale=rescale(recreational_NH_weightedmean_value)
+
+plot(recreational_NH_weightedmean_valuerescale)
+
+#Weighted by the ranked commercial value
+commercial_NH_weightedmean_value<-raster::weighted.mean(x=nursery_habitat_stack, w=c(2,5,3,4,1,6)) 
+
+#Rescaled
+commercial_NH_weightedmean_valuerescale=rescale(commercial_NH_weightedmean_value)
+
+plot(commercial_NH_weightedmean_valuerescale)
+
+#Putting together the summed metrics
+NH_summed_metrics<-stack(total_NH,total_rescaled_NH,recreational_NH_weightedsum_value,recreational_NH_weightedsum_valuerescale,commercial_NH_weightedsum_value,commercial_NH_weightedsum_valuerescale)
+
+names(NH_summed_metrics)<-c("Summed NHV","Summed Rescaled NHV","Rec Fishing Weighted Sum NHV","Rec Fishing WS Rescaled NHV","Com Fishing Weighted Sum NHV","Com Fishing WS Rescaled NHV")
+
+plot(NH_summed_metrics$Summed.NHV)
+
+
+NH_mean_metrics<-stack(mean_NH,mean_rescaled_NH,recreational_NH_weightedmean_value,recreational_NH_weightedmean_valuerescale,commercial_NH_weightedmean_value,commercial_NH_weightedmean_valuerescale)
+
+names(NH_mean_metrics)<-c("Mean NHV","Mean Rescaled NHV","Rec Fishing WM NHV","Rec Fishing WM Rescaled NHV","Com Fishing WM NHV","Com Fishing WM Rescaled NHV")
+
+# save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_AnnualPredictions_March2021.RData")
+
+```
+
+
+  
+#plotting
+```{r}
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+# install.packages("spDataLarge", repos = "https://nowosad.github.io/drat/", type = "source")
+library(spDataLarge)
+library(tmap)    # for static and interactive maps
+library(tmaptools) 
+library(leaflet) # for interactive maps
+library(ggplot2) 
+
+# library(shiny)
+# library(htmltools)
+# tmaptools::palette_explorer()
+  
+# fl_shoreline=sf::read_sf("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Modeling_Biodiversity_Enhancement_Value/dataframes/FL_shoreline.shp")
+
+FL_Map=tm_shape(us_states,bbox=extent(NH_mean_metrics)) +tm_fill() +
+  # tm_borders()+
+  tm_layout(legend.position = c("left","bottom"),inner.margins = 0)
+  
+
+GraySnapper_NH=FL_Map +tm_shape(gray_snapper_rs_annual_clim$mean) + tm_raster(alpha = 1, title="Gray Snapper")
+
+WhiteGrunt_NH=FL_Map + tm_shape(white_grunt_rs_annual_clim$mean) + tm_raster(alpha = 1, title="White Grunt") 
+
+SpottedSeatrout_NH= FL_Map + tm_shape(spotted_seatrout_rs_annual_clim$mean) + tm_raster(alpha = 1, title="Spotted Seatrout")
+
+Lane_Snapper_NH= FL_Map + tm_shape(lane_snapper_rs_annual_clim$mean) + tm_raster(alpha = 1, title="Lane Snapper")
+
+Sheepshead_NH= FL_Map + tm_shape(sheepshead_rs_annual_clim$mean) + tm_raster(alpha = 1, title="Sheepshead")
+
+Pink_Shrimp_NH= FL_Map + tm_shape(pink_shrimp_rs_annual_clim$mean) + tm_raster(alpha = 1, title="Pink Shrimp")
+
+FirstTwo=tmap_arrange(GraySnapper_NH,Lane_Snapper_NH)
+
+SecondTwo=tmap_arrange(SpottedSeatrout_NH, Sheepshead_NH)
+
+ThirdTwo=tmap_arrange(WhiteGrunt_NH, Pink_Shrimp_NH)
+
+# FL_Map_Sum_NHV=FL_Map + tm_shape(NH_summed_metrics$Summed.NHV) + tm_raster(alpha = 1,palette=get_brewer_pal(palette="RdYlGn", n=5, plot=FALSE))
+
+FL_Map_Mean_NHV= FL_Map + tm_shape(NH_mean_metrics$Mean.NHV) + tm_raster(alpha = 1,breaks=c(0,0.05,0.10,0.15,0.20),palette="plasma", title="Unweighted \nProbability")
+
+FL_Map_ComFish_NHV= FL_Map + tm_shape(NH_mean_metrics$Com.Fishing.WM.NHV) + tm_raster(alpha = 1,breaks=c(0,0.05,0.10,0.15,0.20),palette="plasma", title="Commercially \nWeighted")
+
+FL_Map_RecFish_NHV= FL_Map + tm_shape(NH_mean_metrics$Rec.Fishing.WM.NHV) + tm_raster(alpha = 1,breaks=c(0,0.05,0.10,0.15,0.20),palette="plasma", title="Recreationally \nWeighted")
+
+FL_Map_Mean_Rescale_NHV= FL_Map + tm_shape(NH_mean_metrics$Mean.Rescaled.NHV) + tm_raster(alpha = 1,breaks=c(0,0.25,0.5,0.75, 1.0),palette="plasma", title="Unweighted 0-1")
+
+FL_Map_ComFish_Rescale_NHV= FL_Map + tm_shape(NH_mean_metrics$Com.Fishing.WM.Rescaled.NHV) + tm_raster(alpha = 1,breaks=c(0,0.25,0.5,0.75, 1.0),palette="plasma", title="Commercially \nWeighted 0-1")
+
+FL_Map_RecFish_Rescale_NHV= FL_Map + tm_shape(NH_mean_metrics$Rec.Fishing.WM.Rescaled.NHV) + tm_raster(alpha = 1,breaks=c(0,0.25,0.5,0.75, 1.0),palette="plasma", title="Recreationally \nWeighted 0-1")
+
+All_mean_NH_Indices=tmap_arrange(FL_Map_Mean_NHV,FL_Map_ComFish_NHV,FL_Map_RecFish_NHV)
+
+All_mean_NH_rescaled_Indices=tmap_arrange(FL_Map_Mean_Rescale_NHV,FL_Map_ComFish_Rescale_NHV,FL_Map_RecFish_Rescale_NHV)
+
+All_mean_NH_Indices
+
+All_mean_NH_rescaled_Indices
+
+# save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_AnnualPredictions_March2021.RData")
+```
+
+
+# Clipping to Confirmed vs Unconfirmed Seagrass Beds & 
+#Exporting Value Maps for Analysis
+
+```{r}
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_AnnualPredictions_March2021.RData")
+
+rm(list= ls()[!(ls() %in% c("NH_mean_metrics"))])
+
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_Rescaling_BEV_Maps.RData")
+
+
+rm(list= ls()[!(ls() %in% c("Atlantic_Mask", "Dry_Tortugas_Mask","Unconfirmed","Confirmed","NH_mean_metrics", "FL_Map"))])
+
+NHV_Zscores=normImage(NH_mean_metrics$Mean.NHV,norm=TRUE)
+
+NHV_Zscores_plot =FL_Map + tm_shape(NHV_Zscores) + tm_raster(alpha = 1,palette="Spectral", title="NHV Z-Scores")
+
+
+NHV_Zscores_Confirmed=mask(NHV_Zscores,mask=Confirmed,updatevalue=NA)
+
+
+NHV_Zscores_Confirmed_plot=FL_Map +tm_shape(NHV_Zscores_Confirmed) + tm_raster(alpha = 1, title="NHV Z-Scores \nConfirmed Seagrass")
+
+
+NHV_Zscores_PRAs=mask(NHV_Zscores,mask=Unconfirmed,updatevalue=NA)
+# cellStats(BEV_centered_normalized_overlay_Corrected,max)
+
+NHV_Zscores_PRAs_plot=FL_Map +tm_shape(NHV_Zscores_PRAs) + tm_raster(alpha = 1, title="NHV Z-Scores \nPotential Restoration Areas")
+
+
+writeRaster(NHV_Zscores_Confirmed,file="model_output/ES-Model-Outputs/NHV_Zscores_Confirmed.tif",format="GTiff",overwrite=TRUE)
+
+writeRaster(NHV_Zscores_PRAs,file="model_output/ES-Model-Outputs/NHV_Zscores_PRAs.tif",format="GTiff",overwrite=TRUE)
+
+```

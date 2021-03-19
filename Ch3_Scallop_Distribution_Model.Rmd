@@ -1,0 +1,183 @@
+---
+title: "Ch3_Scallop_Distribution_Model"
+author: "Jenn_McHenry"
+date: "2/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#setting and creating working directories 
+wd=getwd()
+data_dir=paste(wd,"/dataframes",sep="");dir.create(data_dir)
+plot_dir=paste(wd,"/plots",sep="");dir.create(plot_dir)
+output_dir=paste(wd,"/model_output",sep="");dir.create(output_dir)
+model_version_dir=paste(wd,"/model_versions",sep="");dir.create(model_version_dir)
+
+library(gstat)
+# devtools::install_github("beckyfisher/FSSgam_package")
+library(FSSgam)
+library(RCurl)
+library(rlang)
+library(dplyr)
+library(plyr)
+library(colorspace)
+# library(tidyverse)
+library(lubridate)
+library(raster)
+library(sf)
+library(maptools)
+library(dplyr)
+library(lubridate)
+library(sp)
+library(benthos)
+library(vegan)
+library(lattice)
+library(ggsci)
+library(corrplot)
+library(data.table)
+library(rgdal)
+library(mgcv)
+# library(beatr)
+library(spatstat)
+library(dunn.test)
+library(mgcv)
+library(spatstat)
+```
+
+#Loading data 
+```{r}
+load("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_ESModel_Fitting_Datasets")
+
+
+```
+
+
+
+#Setting up scallop model 
+```{r}
+names(df_modeling_updated_faunal_species_COMPLETE)
+
+cat.preds=c("Sand","Mud","Rocks","ST_Mangroves","ST_Oysters","ST_Wetland_Vegetation","Seagrass_PA","TH_PA","SY_PA","HA_PA")
+null.vars=c("Reference","Gear_Type")
+cont.preds=c("Depth","Dist_To_Shore","Dist_To_River","Primary.productivity.Max","Temperature.Min","Salinity.Min","Dissolved.oxygen.Min","BottomVegCover","year","month","Longitude","Latitude")
+
+
+# get rid of NA's and unused columns
+scallop.dat=na.omit(df_modeling_updated_faunal_species_COMPLETE[,c(null.vars,cont.preds,cat.preds,"Bay.Scallop")])
+scallop.dat$SeagrassCover=scallop.dat$BottomVegCover
+
+scallop.dat=scallop.dat%>%
+        filter(Gear_Type=="OtterTrawl")
+
+#Looking at cross correlations between continuous variables
+cor(scallop.dat[,cont.preds])
+
+# have a look at the distribution of the continuous predictors
+pdf(file="plots/scallops_pred_vars.pdf",onefile=T)
+for(p in 1:length(cont.preds)){
+par(mfrow=c(2,1))
+ hist(scallop.dat[,cont.preds[p]],main=cont.preds[p])
+ plot(jitter(scallop.dat[,cont.preds[p]]))
+ }
+dev.off()
+
+
+resp.vars=c("Bay.Scallop")
+
+# take a look at the response variables
+pdf(file="plots/scallops_resp_vars.pdf",onefile=T)
+for(r in 1:length(resp.vars)){
+par(mfrow=c(2,1))
+ hist(scallop.dat[,resp.vars[r]],main=resp.vars[r])
+ plot(jitter(scallop.dat[,resp.vars[r]]))
+ }
+dev.off()
+
+
+# #mapping the datapoints along the FGC
+# gulf <- read_sf(dsn = "C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/data/Gulf_Shoreline.shp")
+# fl<-st_crop(gulf,extent(rs_stack_study_region))
+# regions<-readOGR(dsn = "C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/data/FCMAP_shallow_deep/Six_Regions_WGS.shp")
+# 
+# 
+# map1=ggplot()+geom_sf(data = fl)
+# 
+# map2=map1+geom_point(df_modeling_updated_seagrass_COMPLETE,mapping=aes(x=Longitude,y=Latitude))
+# 
+
+```
+
+
+#Fitting Scallop Model
+#Running a model selection prodecure following FSSGam library protocol for seagrass models 
+```{r}
+resp.vars=c("Bay.Scallop")
+
+#test.fit model for all coral, with total points as trials
+require(MuMIn)
+BayScallop1=gam(as.integer(Bay.Scallop)~s(Longitude, Latitude, bs='gp',k=25, m=2),
+             family=nb(),
+             data=scallop.dat,
+             method="ML")
+
+par(mfrow=c(2,4));plot.gam(BayScallop1,shade=TRUE,shade.col="lightblue",scheme=2,all.term=TRUE)
+summary(BayScallop1)
+
+qqnorm(residuals(BayScallop1,type = "deviance"))
+plot(BayScallop1$fitted.values,residuals(BayScallop1,type = "deviance"))
+plot(scallop.dat$Latitude,residuals(BayScallop1,type = "deviance"))
+plot(scallop.dat$Depth,residuals(BayScallop1,type = "deviance"))
+
+#testing for overdispersion
+resid.ssq <- sum(residuals(BayScallop1,type="pearson")^2)  ## sum of squares of Pearson resid
+resid.df <- BayScallop1$df.residual
+Dispersion_Parameter=resid.ssq/resid.df
+Dispersion_Parameter
+
+
+model.set=generate.model.set(use.dat=scallop.dat,
+                          test.fit=BayScallop1,
+                          pred.vars.cont=cont.preds,
+                          cyclic.vars=c("month"),
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(Region,bs='re',k=3)",
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.50,
+                          non.linear.correlations=TRUE,k=4,bs.arg="'ts'")
+
+out.list=fit.model.set(model.set)
+
+#examine the output
+names(out.list)
+out.list$failed.models
+length(out.list$success.models)
+mod.table=out.list$mod.data.out
+mod.table=mod.table[order(mod.table$AICc),]
+head(mod.table)
+
+SeagrassCover_ModelTable=mod.table
+
+# check the predictor correlation matrix
+model.set$predictor.correlations
+
+all.less.2AICc=mod.table[which(mod.table$delta.AICc<2),]
+all.less.2AICc$formula
+
+SeagrassCover_Best=update(SeagrassCover1,. ~ . +te(Depth, Primary.productivity.Max, k = 4, bs = c("ts", "ts")) + Mud)
+
+summary(SeagrassCover_Best)
+
+par(mfrow=c(2,4));plot.gam(SeagrassCover_Best,shade=TRUE,shade.col="lightblue",scheme=2,all.term=TRUE)
+
+
+write.csv(SeagrassCover_ModelTable,file="model_output/Model_Output_Table_SeagrassCover_TW.csv")
+
+
+saveRDS(SeagrassCover_Best,file="model_versions/SeagrassCover_Best_TW.rds")
+
+rm(list= ls()[!(ls() %in% c('wd','data_dir','plot_dir','output_dir','model_version_dir','df_modeling_updated_seagrass_COMPLETE','biooracle_layers','inshore','rs_stack_study_region','SeagrassCover_ModelTable','SeagrassCover_Best','seagrass.dat'))])
+
+```
+

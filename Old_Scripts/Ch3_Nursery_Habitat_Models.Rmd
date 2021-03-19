@@ -1,0 +1,702 @@
+---
+title: "Exploring_Nursery_Habitat_Patterns"
+author: "Jenn_McHenry"
+date: "5/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+#libraries needed
+library(utils)
+library(mgcv)
+library(pROC)
+library(tools)
+library(dplyr)
+library(ggplot2)
+library(doBy)
+library(dplyr)
+library(tidyr)
+library(plyr)
+# Use dredge to test sub-models
+library(MuMIn)
+library(raster)
+library(FSSgam)
+library(nnet)
+# Set the primary working directories
+
+odds_to_prob=function(x){
+        prob<-exp(x)/(1+exp(x))
+        return(prob)
+}
+
+```
+
+
+# loading data
+```{r}
+
+FIM_Final_Nursery_Species=read.csv(file="data/FIM_Final_Juvenile_NurserySpecies_1997_2017.csv")
+names(FIM_Final_Nursery_Species)
+#  [1] "Black Drum"       "Black Grouper"    "Black Sea Bass"  
+#  [4] "Brown Shrimp"     "Common Snook"     "Gag"             
+#  [7] "Goliath Grouper"  "Gray Snapper"     "Lane Snapper"    
+# [10] "Pink Shrimp"      "Red Drum"         "Red Grouper"     
+# [13] "Red Snapper"      "Spotted Seatrout"
+
+levels(as.factor(FIM_Final_Nursery_Species$Gear))
+```
+
+
+
+
+#Run GAMs for all possible nursery species 
+```{r}
+data=FIM_Final_Nursery_Species%>%
+  dplyr::select(Reference,Stage,Gear_Type,Gray.Snapper, Pink.Shrimp,Red.Drum,Spotted.Seatrout, Lane.Snapper,Longitude,Latitude,month,year,BottomVegCover, SAV_Hill0, TH_Cover, SY_Cover, HA_Cover, Depth, Temperature.Mean, Temperature.Range, Temperature.Min, Salinity.Min, Dissolved.oxygen.Min, Primary.productivity.Max, Current.Velocity.Mean, Current.Velocity.Range, Mud, Sand, Rocks, ST_Mangroves, ST_Oysters, Dist_To_Shore,Dist_To_River)%>%
+    mutate(Dist_To_River=ifelse(Dist_To_River>=10,10,Dist_To_River),Mud=as.factor(Mud), Sand=as.factor(Sand), Rocks=as.factor(Rocks), ST_Mangroves=as.factor(ST_Mangroves), ST_Oysters=as.factor(ST_Oysters))%>%
+    mutate(Gray_Snapper_PA=ifelse(Gray.Snapper>0,1,Gray.Snapper),Pink_Shrimp_PA=ifelse(Pink.Shrimp>0,1,Pink.Shrimp),Red_Drum_PA=ifelse(Red.Drum>0,1,Red.Drum),Spotted_Seatrout_PA=ifelse(Spotted.Seatrout>0,1,Spotted.Seatrout))
+
+
+data=data%>%
+  mutate(TH_PA=as.factor(ifelse(TH_Cover>0,1,TH_Cover)),SY_PA=as.factor(ifelse(SY_Cover>0,1,SY_Cover)), HA_PA=as.factor(ifelse(HA_Cover>0,1,HA_Cover)),Seagrass_PA=as.factor(ifelse(BottomVegCover>0,1,0)))
+
+data=data[complete.cases(data),]
+data=unique(data)
+
+data<-distinct(data, Longitude,Latitude, .keep_all= TRUE)
+
+
+write.csv(data,file="data/FIM_Final_NurserySpecies_1997_2017_wideform_meancovaraites_QAQC.csv")
+
+```
+
+
+#Nursery Habitat Presence Absence  Model Selection
+```{r}
+
+data=read.csv(file="data/FIM_Final_NurserySpecies_1997_2017_wideform_meancovaraites_QAQC.csv")
+data=data%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),ST_Mangroves=as.factor(ST_Mangroves),ST_Oysters=as.factor(ST_Oysters),Mud=as.factor(Mud),Sand=as.factor(Sand),Rocks=as.factor(Rocks))
+#   "Gray Snapper"     "Lane Snapper"     "Pink Shrimp"     
+# "Red Drum"            "Spotted Seatrout"
+
+
+#Model Selection Thinned 0.08km fitting data
+##################################################################################
+cat.preds=c("Sand","Mud","Rocks","Seagrass_PA","TH_PA","SY_PA","HA_PA")
+null.vars=c("Reference","Region","Longitude","Latitude")
+cont.preds=c("Depth","Dist_To_Shore","Dist_To_River","Primary.productivity.Max","Dissolved.oxygen.Min","Temperature.Min","Salinity.Min","BottomVegCover","Latitude")
+
+
+data=data%>%
+  mutate(HA_PA=as.factor(HA_PA))
+
+
+#SPOTTED SEATROUT
+#putting gamm into UGamm wrapper
+Spotted_Seatrout_PA_gam_base=mgcv::gam(as.integer(Spotted.Seatrout) ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4),
+             family=nb(),
+             data=data,
+             method="ML")
+
+
+summary(Spotted_Seatrout_PA_gam_base)
+
+cor(data[,cont.preds])
+
+par(mfrow=c(2,3));plot.gam(Spotted_Seatrout_PA_gam_base,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+model.set.SpottedSeatrout.PA=generate.model.set(use.dat=data, test.fit=Spotted_Seatrout_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.70,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling_January2021.RData")
+# trying to run without any registerDoParallel commands for 30 cores.This didnt work.....
+# trying to run without any registerDoParallel commands for 20 cores. This didnt work either........
+# trying to run without any registerDoParallel commands for 30 cores. Trying again after reloading the workspace for just after I ran the seagrsss cover models selection.
+
+out.list.SpottedSeatrout.PA=fit.model.set(model.set.SpottedSeatrout.PA)
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling_January2021.RData")
+
+#examine the output
+names(out.list.SpottedSeatrout.PA)
+out.list.SpottedSeatrout.PA$failed.models
+length(out.list.SpottedSeatrout.PA$success.models)
+mod.table.SpottedSeatrout.PA=out.list.SpottedSeatrout.PA$mod.data.out
+mod.table.SpottedSeatrout.PA=mod.table.SpottedSeatrout.PA[order(mod.table.SpottedSeatrout.PA$AICc),]
+head(mod.table.SpottedSeatrout.PA)
+
+Spotted_Seatrout_PA_ModelTable_SpaceTime=mod.table.SpottedSeatrout.PA
+
+write.csv(Spotted_Seatrout_PA_ModelTable_SpaceTime,file ="model_output/SpottedSeatrout_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Spotted_Seatrout_PA_ModelTable_SpaceTime$predictor.correlations
+
+all.less.2AICc=Spotted_Seatrout_PA_ModelTable_SpaceTime[which(Spotted_Seatrout_PA_ModelTable_SpaceTime$delta.AICc<2),]
+all.less.2AICc$formula
+
+
+ 
+# #Spotted Seatrout PA Best Model
+Spotted_Seatrout_PA_gam_Best=mgcv::gam(Spotted_Seatrout_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + te(BottomVegCover,Depth,k=4,bs="ts")+s(Temperature.Min,k=4,bs="ts"),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+
+summary(Spotted_Seatrout_PA_gam_Best)
+
+AIC(Spotted_Seatrout_PA_gam_base,Spotted_Seatrout_PA_gam_Best)
+
+SpottedSeatrout_PA_train_predict<-as.data.frame(predict.gam(object=Spotted_Seatrout_PA_gam_Best,newdata=Spotted_Seatrout_PA_gam_Best$model,type=c("response"),se.fit=TRUE))
+  
+SpottedSeatrout_full_train_AUC=SDMTools::auc(as.integer(Spotted_Seatrout_PA_gam_Best$model$Spotted_Seatrout_PA), as.numeric(Spotted_Seatrout_PA_gam_Best$fit))
+SpottedSeatrout_full_train_AUC
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Spotted_Seatrout_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+saveRDS(Spotted_Seatrout_PA_gam_Best,file="model_versions/Spotted_Seatrout_binomial_gam_spacetime.rds")
+
+
+
+#Red drum ("redfish")
+Red_Drum_PA_gam_base=mgcv::gam(Red_Drum_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+# # 
+# Red_Drum_PA_gamm_base_CorExp=gamm(Red_Drum_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4), random=list(month=~1,year=~1),
+#              family="binomial",
+#              data=data,
+#              method="ML",
+#              correlation=corExp(form=~Longitude+Latitude, nugget=TRUE))
+# 
+# Red_Drum_PA_gamm_base_CorGaus=gamm(Red_Drum_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4), random=list(month=~1,year=~1),
+#              family="binomial",
+#              data=data,
+#              method="ML",
+#              correlation=corGaus(form=~Longitude+Latitude, nugget=TRUE))
+# 
+# Red_Drum_PA_gamm_base_CorSph=gamm(Red_Drum_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4), random=list(month=~1,year=~1),
+#              family="binomial",
+#              data=data,
+#              method="ML",
+#              correlation=corSpher(form=~Longitude+Latitude, nugget=TRUE))
+# 
+
+
+model.set.RedDrum.PA=generate.model.set(use.dat=data, test.fit=Red_Drum_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.50,
+                          # non.linear.correlations=TRUE,
+                          max.predictors = 4,
+                          k=4, bs.arg="'ts'")
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+
+out.list.RedDrum.PA=fit.model.set(model.set.RedDrum.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+
+#examine the output
+names(out.list.RedDrum.PA)
+out.list.RedDrum.PA$failed.models
+length(out.list.RedDrum.PA$success.models)
+mod.table.RedDrum.PA=out.list.RedDrum.PA$mod.data.out
+mod.table.RedDrum.PA=mod.table.RedDrum.PA[order(mod.table.RedDrum.PA$AICc),]
+head(mod.table.RedDrum.PA)
+
+Red_Drum_PA_ModelTable_SpaceTime=mod.table.RedDrum.PA
+
+write.csv(Red_Drum_PA_ModelTable_SpaceTime,file ="model_output/RedDrum_PA_ModelTable.csv")
+
+
+
+# check the predictor correlation matrix
+Red_Drum_PA_ModelTable_SpaceTime$predictor.correlations
+
+all.less.2AICc=Red_Drum_PA_ModelTable_SpaceTime[which(Red_Drum_PA_ModelTable_SpaceTime$delta.AICc<2),]
+all.less.2AICc$formula
+
+Red_Drum_PA_gam_Best=mgcv::gam(Red_Drum_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4) +
+                                HA_PA+
+                                 te(Depth,BottomVegCover,bs="ts",k=4) +
+                                 te(Dist_To_River,Temperature.Min,bs="ts",k=4),
+                                          family=binomial(),
+             data=data,
+             method="ML")
+summary(Red_Drum_PA_gam_Best)
+
+RedDrum_PA_train_predict<-as.data.frame(predict.gam(object=Red_Drum_PA_gam_Best,newdata=Red_Drum_PA_gam_Best$model,type=c("response"),se.fit=TRUE))
+  
+RedDrum_full_train_AUC=SDMTools::auc(as.integer(Red_Drum_PA_gam_Best$model$Red_Drum_PA), as.numeric(RedDrum_PA_train_predict$fit))
+
+RedDrum_full_train_AUC
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Red_Drum_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+saveRDS(Red_Drum_PA_gam_Best,file="model_versions/Red_Drum_binomial_gam_spacetime.rds")
+
+
+
+#Pink Shrimp ("redfish")
+Pink_Shrimp_PA_gam_base=mgcv::gam(Pink_Shrimp_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+
+model.set.PinkShrimp.PA=generate.model.set(use.dat=data, test.fit=Pink_Shrimp_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.50,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+
+
+out.list.PinkShrimp.PA=fit.model.set(model.set.PinkShrimp.PA)
+
+
+#examine the output
+names(out.list.PinkShrimp.PA)
+out.list.PinkShrimp.PA$failed.models
+length(out.list.RedDrum.PA$success.models)
+mod.table.PinkShrimp.PA=out.list.PinkShrimp.PA$mod.data.out
+mod.table.PinkShrimp.PA=mod.table.PinkShrimp.PA[order(mod.table.PinkShrimp.PA$AICc),]
+head(mod.table.PinkShrimp.PA)
+
+Pink_Shrimp_PA_ModelTable_SpaceTime=mod.table.PinkShrimp.PA
+
+write.csv(Pink_Shrimp_PA_ModelTable_SpaceTime,file ="model_output/PinkShrimp_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Pink_Shrimp_PA_ModelTable_SpaceTime$predictor.correlations
+
+all.less.2AICc=Pink_Shrimp_PA_ModelTable_SpaceTime[which(Pink_Shrimp_PA_ModelTable_SpaceTime$delta.AICc<2),]
+all.less.2AICc$formula
+
+Pink_Shrimp_PA_gam_Best=mgcv::gam(Pink_Shrimp_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4) +
+                                    HA_PA +
+                                 # te(Temperature.Min,Dissolved.oxygen.Min,bs="ts",k=4)+
+                                 s(Depth,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+summary(Pink_Shrimp_PA_gam_Best)
+
+PinkShrimp_PA_train_predict<-as.data.frame(predict.gam(object=Pink_Shrimp_PA_gam_Best,newdata=Pink_Shrimp_PA_gam_Best$model,type=c("response"),se.fit=TRUE))
+  
+PinkShrimp_full_train_AUC=SDMTools::auc(as.integer(Pink_Shrimp_PA_gam_Best$model$Pink_Shrimp_PA), as.numeric(PinkShrimp_PA_train_predict$fit))
+
+PinkShrimp_full_train_AUC
+
+AIC(Pink_Shrimp_PA_gam_Best)
+
+saveRDS(Pink_Shrimp_PA_gam_Best,file="model_versions/Pink_Shrimp_binomial_gam_spacetime.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Pink_Shrimp_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+#Gray snapper
+Grey_Snapper_PA_gam_base=mgcv::gam(Gray_Snapper_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+
+model.set.GraySnapper.PA=generate.model.set(use.dat=data, test.fit=Grey_Snapper_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.50,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+
+out.list.GraySnapper.PA=fit.model.set(model.set.GraySnapper.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+
+#examine the output
+names(out.list.GraySnapper.PA)
+out.list.GraySnapper.PA$failed.models
+length(out.list.GraySnapper.PA$success.models)
+mod.table.GraySnapper.PA=out.list.GraySnapper.PA$mod.data.out
+mod.table.GraySnapper.PA=mod.table.GraySnapper.PA[order(mod.table.GraySnapper.PA$AICc),]
+head(mod.table.GraySnapper.PA)
+
+Gray_Snapper_PA_ModelTable_SpaceTime=mod.table.GraySnapper.PA
+
+write.csv(Gray_Snapper_PA_ModelTable_SpaceTime,file ="model_output/Gray_Snapper_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Gray_Snapper_PA_ModelTable_SpaceTime$predictor.correlations
+
+all.less.2AICc=Gray_Snapper_PA_ModelTable_SpaceTime[which(Gray_Snapper_PA_ModelTable_SpaceTime$delta.AICc<2),]
+all.less.2AICc$formula
+
+Gray_Snapper_PA_gam_Best=mgcv::gam(Gray_Snapper_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4) +
+                                 s(Dist_To_Shore,bs="ts",k=4)+
+                                 te(Depth,BottomVegCover,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Gray_Snapper_PA_gam_Best)
+
+
+GraySnapper_PA_train_predict<-as.data.frame(predict.gam(object=Gray_Snapper_PA_gam_Best,newdata=Gray_Snapper_PA_gam_Best$model,type=c("response"),se.fit=TRUE))
+  
+GraySnapper_full_train_AUC=SDMTools::auc(as.integer(Gray_Snapper_PA_gam_Best$model$Gray_Snapper_PA), as.numeric(GraySnapper_PA_train_predict$fit))
+
+saveRDS(Gray_Snapper_PA_gam_Best,file="model_versions/Gray_Snapper_binomial_gam_spacetime.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Gray_Snapper_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+#Lane snapper
+
+data=data%>%
+  mutate(Lane_Snapper_PA=ifelse(Lane.Snapper>0,1,Lane.Snapper))
+
+Lane_Snapper_PA_gam_base=mgcv::gam(Lane_Snapper_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+
+
+model.set.LaneSnapper.PA=generate.model.set(use.dat=data, test.fit=Lane_Snapper_PA_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = "s(year,bs='ts',k=4)",
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.50,
+                          max.predictors = 4,
+                          # non.linear.correlations=TRUE,
+                          k=4, bs.arg="'ts'")
+
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+
+out.list.LaneSnapper.PA=fit.model.set(model.set.LaneSnapper.PA)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+
+
+#examine the output
+names(out.list.LaneSnapper.PA)
+out.list.LaneSnapper.PA$failed.models
+length(out.list.LaneSnapper.PA$success.models)
+mod.table.LaneSnapper.PA=out.list.LaneSnapper.PA$mod.data.out
+mod.table.LaneSnapper.PA=mod.table.LaneSnapper.PA[order(mod.table.LaneSnapper.PA$AICc),]
+head(mod.table.LaneSnapper.PA)
+
+Lane_Snapper_PA_ModelTable_SpaceTime=mod.table.LaneSnapper.PA
+
+write.csv(Lane_Snapper_PA_ModelTable_SpaceTime,file ="model_output/Lane_Snapper_PA_ModelTable.csv")
+
+# check the predictor correlation matrix
+Lane_Snapper_PA_ModelTable_SpaceTime$predictor.correlations
+
+all.less.2AICc=Lane_Snapper_PA_ModelTable_SpaceTime[which(Lane_Snapper_PA_ModelTable_SpaceTime$delta.AICc<2),]
+all.less.2AICc$formula
+
+Lane_Snapper_PA_gam_Best=mgcv::gam(Lane_Snapper_PA ~ s(Longitude, Latitude, bs='gp',k=-1, m=2) + s(month,bs="cc",k=4) + s(year,bs="ts",k=4) +
+                                 te(Dist_To_Shore,Primary.productivity.Max,bs="ts",k=4)+
+                                 te(Depth,BottomVegCover,bs="ts",k=4),
+             family=binomial(),
+             data=data,
+             method="ML")
+summary(Lane_Snapper_PA_gam_Best)
+
+
+LaneSnapper_PA_train_predict<-as.data.frame(predict.gam(object=Lane_Snapper_PA_gam_Best,newdata=Lane_Snapper_PA_gam_Best$model,type=c("response"),se.fit=TRUE))
+  
+LaneSnapper_full_train_AUC=SDMTools::auc(as.integer(Lane_Snapper_PA_gam_Best$model$Lane_Snapper_PA), as.numeric(LaneSnapper_PA_train_predict$fit))
+
+saveRDS(Lane_Snapper_PA_gam_Best,file="model_versions/Lane_Snapper_binomial_gam_spacetime.rds")
+
+# scaled to the mean and converted to probability
+par(mfrow=c(2,3));plot.gam(Lane_Snapper_PA_gam_Best,shade=TRUE,shade.col="lightblue",scheme=2,trans=odds_to_prob,all.term=TRUE)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Chapter3_NurseryHabitat_Modeling.RData")
+```
+
+
+
+#Predicting nursery habitat (current seagrass conditions)
+```{r}
+
+# rs_stack_study_region_inshore=mask(x=rs_stack_study_region, mask=inshore,inverse=FALSE,
+#       maskvalue=NA, updatevalue=NA, updateNA=FALSE)
+# 
+# 
+# writeRaster(rs_stack_study_region_inshore,"predictor_stack_inshore/Predictors_Inshore.grid", format="raster")
+# 
+
+
+rs_stack_study_region_inshore_grid=stack("predictor_stack_inshore/Predictors_Inshore.grd")
+rs_stack_study_region_inshore_grid=raster::subset(rs_stack_study_region_inshore_grid,c(1,5,11,17,23,29,35,41,47,53,59,71,81:89))
+names(rs_stack_study_region_inshore_grid)
+
+
+rs_stack_study_region_inshore_grid$DissolvedO2=rs_stack_study_region_inshore_grid$DissolvedO2*(0.001)*32
+
+Seagrass_Landscape=raster("C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/data/SG_landscape.tif")
+Seagrass_Landscape=resample(Seagrass_Landscape,rs_stack_study_region_inshore_grid[[1]])
+names(Seagrass_Landscape)<-c("Seagrass_Landscape")
+Seagrass_Landscape[is.na(Seagrass_Landscape)==TRUE]<-0
+Seagrass_Landscape[Seagrass_Landscape==1]<-5
+Seagrass_Landscape[Seagrass_Landscape==2]<-2
+
+Temperature_9=raster("C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/HYCOM/Temperature_September.tif")
+Temperature_9=resample(Temperature_9,rs_stack_study_region_inshore_grid[[1]])
+names(Temperature_9)<-c("Temperature")
+
+Salinity_9=raster("C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/HYCOM/Salinity_9.tif")
+Salinity_9=resample(Salinity_9,rs_stack_study_region_inshore_grid[[1]])
+names(Salinity_9)<-c("Salinity")
+
+
+rs_stack_study_region_inshore_grid$Temperature<-Temperature_9
+
+TH_Coverage=raster(x="C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/arc_output/Seagrass_SDM_output/TH_highres_Cover_Cropped.tif")
+
+extent(TH_Coverage)<-extent(rs_stack_study_region)
+TH_Coverage[TH_Coverage<1]<-0
+
+SY_Coverage=raster(x="C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/arc_output/Seagrass_SDM_output/SY_highres_Cover_Cropped.tif")
+SY_Coverage[SY_Coverage<1]<-0
+
+extent(SY_Coverage)<-extent(rs_stack_study_region)
+
+HA_Coverage=raster(x="C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/arc_output/Seagrass_SDM_output/HA_highres_Cover_Cropped.tif")
+HA_Coverage[HA_Coverage<1]<-0
+extent(HA_Coverage)<-extent(rs_stack_study_region)
+
+SAV_Hill0=raster("C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/arc_output/Seagrass_SDM_output/SAV_Hill0_highres_croppsed.tif")
+names(SAV_Hill0)<-c("SAV_Hill0")
+SAV_Hill0[SAV_Hill0<1]<-0
+
+SAV_Hill0=mask(SAV_Hill0,rs_stack_study_region_inshore_grid$Depth)
+plot(SAV_Hill0)
+
+
+rs_stack_study_region_inshore_grid$TH_Coverage<-TH_Coverage
+rs_stack_study_region_inshore_grid$SY_Coverage<-SY_Coverage
+rs_stack_study_region_inshore_grid$HA_Coverage<-HA_Coverage
+rs_stack_study_region_inshore_grid$Seagrass_Landscape<-Seagrass_Landscape
+rs_stack_study_region_inshore_grid$SAV_Hill0<-SAV_Hill0
+
+#TOTAL SAV
+SAV=TH_Coverage+SY_Coverage+HA_Coverage
+# SAV=raster("C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/arc_output/Seagrass_SDM_output/BottomVegCover_cropped.tif")
+# 
+SAV[SAV>100]<-100
+plot(SAV)
+
+rs_stack_study_region_inshore_grid$BottomVegCover<-SAV
+
+SAV_PA=rs_stack_study_region_inshore_grid$BottomVegCover
+SAV_PA[SAV_PA<=1]<-0
+SAV_PA[SAV_PA>0]<-1
+
+rs_stack_study_region_inshore_grid$SAV_PA<-SAV_PA
+
+rs_stack_study_region_inshore_grid_WO_SAV<-rs_stack_study_region_inshore_grid
+rs_stack_study_region_inshore_grid_WO_SAV$TH_Coverage<-0
+rs_stack_study_region_inshore_grid_WO_SAV$SY_Coverage<-0
+rs_stack_study_region_inshore_grid_WO_SAV$HA_Coverage<-0
+rs_stack_study_region_inshore_grid_WO_SAV$BottomVegCover<-0
+rs_stack_study_region_inshore_grid_WO_SAV$SAV_Hill0<-0
+rs_stack_study_region_inshore_grid_WO_SAV$Seagrass_Landscape<-0
+
+
+# rs_stack_study_region_inshore_grid_winter=rs_stack_study_region_inshore_grid
+# rs_stack_study_region_inshore_grid_winter$month<-3
+# 
+# rs_stack_study_region_inshore_grid_WO_SAV_winter=rs_stack_study_region_inshore_grid_WO_SAV
+# rs_stack_study_region_inshore_grid_WO_SAV_winter$month<-3
+
+
+predfun <- function(model, data) {
+  v <- predict.gam(model, data,type="response",se.fit=TRUE)
+  cbind(p=as.vector(v$fit), se=as.vector(v$se.fit))
+}
+
+
+##With Seagrass
+#Summer High
+#SpottedSeatrout
+saveRDS(object = spottedseatrout_9_interactions_1,file="nursery_models/spottedseatrout_final.rds")
+pred_spottedseatrout=raster::predict(object=rs_stack_study_region_inshore_grid,model=spottedseatrout_9_interactions_1,fun=predfun,file="projections/pred_spottedseatrout.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+
+
+
+#Reddrum
+saveRDS(object = reddrum_5_interactions_3,file="nursery_models/reddrum_final.rds")
+pred_reddrum=raster::predict(object=rs_stack_study_region_inshore_grid,model=reddrum_5_interactions_3,fun=predfun,file="projections/pred_reddrum.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+
+
+
+#Pink Shrimp
+saveRDS(object = pinkshrimp_5_interactions_1,file="nursery_models/pinkshrimp_final.rds")
+pred_pinkshrimp=predict(object=rs_stack_study_region_inshore_grid,model=pinkshrimp_5_interactions_1,fun=predfun,file="projections/pred_pinkshrimp.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+
+# 
+
+#Gray Snapper
+saveRDS(object = graysnapper_9_interactions_1,file="nursery_models/graysnapper_final.rds")
+pred_graysnapper=raster::predict(object = rs_stack_study_region_inshore_grid,model=graysnapper_9_interactions_1,fun=predfun,file="projections/pred_graysnapper.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+
+
+
+# #Gag Grouper
+# saveRDS(object = gag_11 ,file="nursery_models/gag_final.rds")
+# pred_gag=raster::predict(object = rs_stack_study_region_inshore_grid,model=gag_11,fun=predfun,file="projections/pred_gag.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_gag$pred_gag.1)
+# 
+
+# #Lane Snapper
+# saveRDS(object = lanesnapper_13_interactions ,file="nursery_models/lanesnapper_final.rds")
+# pred_lanesnapper=raster::predict(object = rs_stack_study_region_inshore_grid,model=lanesnapper_13_interactions,fun=predfun,file="projections/pred_lanesnapper.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_lanesnapper$pred_lanesnapper.1)
+
+
+# ##Without Seagrass
+# #Summer High
+# 
+# #SpottedSeatrout
+# pred_spottedseatrout_WOSAV=raster::predict(object=rs_stack_study_region_inshore_grid_WO_SAV,model=spottedseatrout_9_interactions_1,fun=predfun,file="projections/pred_spottedseatrout_WOSAV.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_spottedseatrout_WOSAV$pred_spottedseatrout_WOSAV.1)
+# 
+# #Reddrum
+# pred_reddrum_WOSAV=raster::predict(object=rs_stack_study_region_inshore_grid_WO_SAV,model=reddrum_5_interactions_3,fun=predfun,file="projections/pred_reddrum_WOSAV.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_reddrum_WOSAV$pred_reddrum_WOSAV.1)
+# 
+# 
+# #Pink Shrimp
+# pred_pinkshrimp_WOSAV=predict(object=rs_stack_study_region_inshore_grid_WO_SAV,model=pinkshrimp_5_interactions_1,fun=predfun,file="projections/_pred_pinkshrimp_WOSAV.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_pinkshrimp_WOSAV$X_pred_pinkshrimp_WOSAV.1)
+# 
+# #Gray Snapper
+# pred_graysnapper_WOSAV=raster::predict(object = rs_stack_study_region_inshore_grid_WO_SAV,model=graysnapper_9_interactions_1,fun=predfun,file="projections/pred_graysnapper_WOSAV.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_graysnapper_WOSAV$pred_graysnapper_WOSAV.1)
+# 
+# #Lane Snapper
+# pred_lanesnapper_WOSAV=raster::predict(object = rs_stack_study_region_inshore_grid_WO_SAV,model=lanesnapper_13_interactions,fun=predfun,file="projections/pred_lanesnapper_WOSAV.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_lanesnapper_WOSAV$pred_lanesnapper_WOSAV.1)
+# 
+# #Gag Grouper
+# pred_gag_WOSAV=raster::predict(object = rs_stack_study_region_inshore_grid_WO_SAV,model=gag_11,fun=predfun,file="projections/pred_gag.tif",index=1:2,na.rm=TRUE,overwrite=TRUE)
+# plot(pred_gag$pred_gag.1)
+
+
+save.image("Datasets_and_Models_for_SG_NurseryHabitat_with_Projections.RData")
+
+
+```
+
+
+# Nursery Figures 
+```{r}
+library(sf)
+
+gulf <- read_sf(dsn ="C:/Users/jennm/Dropbox/GITHUB/NASEM_Seagrass_EcosystemServices/Biodiversity_Data_Exploration/data/Gulf_Shoreline.shp")
+fl<-st_crop(gulf,extent(rs_stack_study_region_inshore_grid))
+
+study_area=read_sf(dsn="C:/Users/jennm/Dropbox/PROJECTS/NAS_Seagrass_Project/Data/RAW/Jurasdictional_Layers/Gulf_Coast_Florida_StudyRegion_WGS84.shp")
+
+# Assign color to a object for repeat use/ ease of changing
+myCol = hcl.colors(5,palette="PuRd",rev = TRUE)
+
+
+delta_spottedseatrout=pred_spottedseatrout$pred_spottedseatrout.1-pred_spottedseatrout_WOSAV$pred_spottedseatrout_WOSAV.1
+
+delta_reddrum=pred_reddrum$pred_reddrum.1-pred_reddrum_WOSAV$pred_reddrum_WOSAV.1
+
+
+delta_pinkshrimp=pred_pinkshrimp$X_pred_pinkshrimp.1 - pred_pinkshrimp_WOSAV$X_pred_pinkshrimp_WOSAV.1
+
+delta_graysnapper=pred_graysnapper$pred_graysnapper.1 - pred_graysnapper_WOSAV$pred_graysnapper_WOSAV.1
+
+delta_lanesnapper=pred_lanesnapper$pred_lanesnapper.1 - pred_lanesnapper_WOSAV$pred_lanesnapper_WOSAV.1
+
+
+delta_gag=pred_gag$pred_gag.1 - pred_gag_WOSAV$pred_gag.1
+
+
+##Spotted Seatrout
+summary(spottedseatrout_9_interactions_1)
+par(mfrow=c(3,3));plot(spottedseatrout_9_interactions_1,shade=TRUE,shade.col = "lightblue",scheme=2,shift=coef(spottedseatrout_9_interactions_1)[1], scale=0,all.terms=TRUE)
+
+par(mfrow=c(1,1));
+raster::plot(pred_spottedseatrout$pred_spottedseatrout.1,col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE),main="Juvenile Spotted Seatrout (#/100sqm)");
+
+raster::plot(pred_spottedseatrout_WOSAV$pred_spottedseatrout_WOSAV.1, col = myCol, colNA="lightblue", addfun=plot(fl,col="grey",add=TRUE), main="Juvenile Spotted Seatrout - No Seagrass (#/100sqm)")
+
+
+plot(delta_spottedseatrout,breaks = c(0,0.1,1,2,3),col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE), main="Nursery Value for Spotted Seatrout (Delta #/100sqm)")
+
+
+##Reddrum
+summary(reddrum_5_interactions_3)
+par(mfrow=c(3,3));plot(reddrum_5_interactions_3,shade=TRUE,shade.col = "lightblue",scheme=2,shift=coef(reddrum_5_interactions_3)[1], scale=0,all.terms=TRUE)
+
+par(mfrow=c(1,1));
+raster::plot(pred_reddrum$pred_reddrum.1,col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE),main="Juvenile Reddrum (#/100sqm)");
+
+
+raster::plot(pred_reddrum_WOSAV$pred_reddrum_WOSAV.1,breaks=c(0,1,10,25,50,75),col = myCol, colNA="lightblue", addfun=plot(fl,col="grey",add=TRUE), main="Juvenile Reddrum - No Seagrass (#/100sqm)")
+
+plot(delta_reddrum,breaks = c(0,5,10,25,50,75),col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE), main="Nursery Value for Reddrum (Delta #/100sqm)")
+
+##Pink Shrimp
+summary(pinkshrimp_5_interactions_1)
+par(mfrow=c(2,3));plot(pinkshrimp_5_interactions_1,shade=TRUE,shade.col = "lightblue",scheme=2,shift=coef(pinkshrimp_5_interactions_1)[1], scale=0,all.terms=TRUE)
+
+par(mfrow=c(1,1));
+raster::plot(pred_pinkshrimp$pred_pinkshrimp.1,col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE),main="Juvenile Pink Shrimp (#/100sqm)");
+
+raster::plot(pred_pinkshrimp_WOSAV$X_pred_pinkshrimp_WOSAV.1, breaks = c(0,0.1,0.5,1,2,3),col = myCol, colNA="lightblue", addfun=plot(fl,col="grey",add=TRUE), main="Juvenile Pink Shrimp - No Seagrass (#/100sqm)")
+
+plot(delta_pinkshrimp,breaks = c(-1,-0.5,0,0.5,1),col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE), main="Nursery Value for Pink Shrimp (Delta #/100sqm)")
+
+
+##Gray snapper
+par(mfrow=c(1,1));
+raster::plot(pred_graysnapper$pred_graysnapper.1,col = myCol, colNA="lightblue",addfun=plot(fl,col="grey",add=TRUE),main="Juvenile Gray Snapper (#/100sqm)");
+
+
+```
+
