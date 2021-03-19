@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
+/large_data/*
+/model_output/nursery_monthly/*
