@@ -95,7 +95,7 @@ names(LOI)
 
 LOI_QAQC=LOI[c(2:8,11:12,23:35)]
 names(LOI_QAQC)
-head(LOI_QAQC)
+# head(LOI_QAQC)
 
 colnames(LOI_QAQC)=c("Site","Quadrat","Bagged_Slice_Number","Slice_Number","Analysis","Rhizome_Removed","Slice_Height_cm","Shell_gDW","Rhizome_gDW","Frac_OLOI","Frac_ILOI","OLOI","ILOI","Sample_Weight_gDW","Sediment_Weight_gDW","Sample_Density_g_per_ml","Sediment_Density_g_per_ml","Organic_Content_gDW","Inorganic_Content_gDW","Organic_Density_g_per_ml","Inorganic_Density_g_per_ml","Percent_Carbon")
 levels(LOI_QAQC$Site)
@@ -113,13 +113,13 @@ levels(as.factor(LOI_QAQC$Quadrat))
 # RIGHT NOW I'M CALCULATING DENSITIES AND THEN MULTIPLYING THE PERCENTAGES
 
 LOI_QAQC=LOI_QAQC%>%
-  dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*(1/Compaction_Ratio)),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
+  dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*Compaction_Ratio),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
  dplyr::mutate(Sample_Density_g_per_ml=Sample_Weight_gDW/Slice_Volume,
          Sediment_Density_g_per_ml=Sediment_Weight_gDW/Slice_Volume,
          Organic_Density_g_per_ml=Frac_OLOI * Sediment_Density_g_per_ml,
          Inorganic_Density_g_per_ml=Frac_ILOI * Sediment_Density_g_per_ml)%>%
- dplyr::mutate(Frac_Shell=Shell_gDW/Sample_Weight_gDW,
-         Shell_Density_g_per_ml=Frac_Shell*Sample_Density_g_per_ml,
+ dplyr::mutate(Frac_Shell_Carbonate=(Shell_gDW*0.12)/Sample_Weight_gDW,
+         Shell_Carbonate_Density_g_per_ml=Frac_Shell_Carbonate*Sample_Density_g_per_ml,
          Frac_Rhizome=Rhizome_gDW/Sample_Weight_gDW,
          Rhizome_Density_g_per_ml=Frac_Rhizome*Sample_Density_g_per_ml)%>%
   dplyr::select(1:10,26:27,11:25,28:31)%>%
@@ -135,7 +135,7 @@ write.csv(LOI_QAQC,file="data_output/LOI_Data_version_QAQC_03_18_2020.csv")
 #Grain size analysis 
 Grainsize=read.csv("data/Carbon/Grainsize_Data_version_03_18_2021.csv")
 Grainsize=as.data.frame(Grainsize)
-head(Grainsize)
+# head(Grainsize)
 summary(Grainsize)
 names(Grainsize)
 
@@ -154,7 +154,7 @@ levels(Grainsize_QAQC$Site)
 
 Grainsize_QAQC=Grainsize_QAQC%>%
   # mutate(Rhizome_Removed=ifelse(Slice_Number==4,"Y","N"))%>%
-    dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*(1/Compaction_Ratio)),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
+    dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*Compaction_Ratio),Slice_Volume=pi*(2.54^2)*Slice_Height_Corrected_cm)%>%
   mutate(Sample_Density_g_per_ml=Sample_Weight_gDW/Slice_Volume,
          Sediment_Density_g_per_ml=Sediment_Weight_gDW/Slice_Volume,
          Frac_Rhizome=Rhizome_gDW/Sample_Weight_gDW,
@@ -206,7 +206,7 @@ LOI_QAQC_By_Site_Slice=LOI_QAQC%>%
   dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE),Organic_Density_g_per_ml=mean(Organic_Density_g_per_ml,na.rm=TRUE),Inorganic_Density_g_per_ml=mean(Inorganic_Density_g_per_ml,na.rm=TRUE),Percent_Carbon=mean(Percent_Carbon,na.rm=TRUE),Rhizome_Density_g_per_ml=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),Shell_Density_g_per_ml=mean(Shell_Density_g_per_ml,na.rm=TRUE),Sediment_Density_g_per_ml=mean(Sediment_Density_g_per_ml,na.rm=TRUE))%>%
   ungroup()%>%
   filter(is.na(OLOI)==FALSE)%>%
-  dplyr::mutate(Organic_Carbon_Density_g_per_ml=(Organic_Density_g_per_ml/100) * Sediment_Density_g_per_ml,
+  dplyr::mutate(Organic_Carbon_Density_g_per_ml=(Percent_Carbon/100) * Sediment_Density_g_per_ml,
          Inorganic_Carbon_Density_g_per_ml=(Inorganic_Density_g_per_ml* 0.12),
          Total_Carbon_Density_g_per_ml=Organic_Carbon_Density_g_per_ml+Inorganic_Carbon_Density_g_per_ml)
 
