@@ -29,13 +29,18 @@ library(FSSgam)
 
 load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Datasets.RData")
 
+
 ls()
 
 rm(list= ls()[!(ls() %in% c("BlueCarbon_QAQC", "LOI_QAQC_By_Site_Slice","seagrass_survey_AND_Clippings_By_Site"))])
 
-BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
 BlueCarbon_QAQC=BlueCarbon_QAQC%>%
-  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Factor=as.factor(Factor))
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Factor=as.factor(Factor))%>%
+  mutate(Depth_m=ifelse(Region=="Saint Marks" & is.na(Depth_m)==TRUE,0.792,Depth_m),
+         Secchi_m=ifelse(Region=="Saint Marks" & is.na(Secchi_m)==TRUE,0.401,Secchi_m))
+
+
+BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
 
 # BlueCarbon_QAQC=BlueCarbon_QAQC%>%
 #   mutate(Dist_To_River=ifelse(Dist_To_River>10,10,Dist_To_River))
@@ -49,7 +54,7 @@ cont.preds=c("Depth_m","Dist_To_Shore","Dist_To_River","Nitrate.Mean",
              "Rhizome_Stock_g_per_sqm",
              "Thalassia.testudinum", "Syringodium.filiforme",
              "Halodule.wrightii","Seagrass_Spp",
-             "Percent_Coarse","Percent_Medium","Percent_Silt","Percent_Sands")
+             "Percent_Coarse","Percent_Medium","Percent_Fine","Percent_Silt")
 
 cor(BlueCarbon_QAQC[cont.preds],)
 
@@ -81,19 +86,19 @@ ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Seagrass_Biomass_gDW)) + geom_histo
 
 ggplot(Seagrass_Clippings_By_Site_QAQC,aes(y=Seagrass_Biomass_gDW,x=Factor,fill=Factor)) + geom_boxplot()
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Seagrass_Spp,y=Seagrass_Biomass_gDW)) + geom_point()
+ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Seagrass_Spp,y=Seagrass_Biomass_gDW)) + geom_point()+geom_smooth(method="gam")
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Thalassia.testudinum.AreaCover,y=Thalassia_testudinum_gDW)) + geom_point() +geom_smooth(method="lm")
+ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Thalassia.testudinum.AreaCover,y=Thalassia_testudinum_gDW)) + geom_point() +geom_smooth(method="gam")
 
 TH_lm=lm(Thalassia_testudinum_gDW~Thalassia.testudinum.AreaCover,data = Seagrass_Clippings_By_Site_QAQC)
 summary(TH_lm)
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Syringodium.filiforme.AreaCover,y=Syringodium_filiforme_gDW)) + geom_point()+geom_smooth(method="lm")
+ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Syringodium.filiforme.AreaCover,y=Syringodium_filiforme_gDW)) + geom_point()+geom_smooth(method="gam")
 
 SY_lm=lm(Syringodium_filiforme_gDW~Syringodium.filiforme.AreaCover,data = Seagrass_Clippings_By_Site_QAQC)
 summary(SY_lm)
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Halodule.wrightii.AreaCover,y=Halodule_wrightii_gDW)) + geom_point() +geom_smooth(method="lm")
+ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Halodule.wrightii.AreaCover,y=Halodule_wrightii_gDW)) + geom_point() +geom_smooth(method="gam")
 
 HA_lm=lm(Halodule_wrightii_gDW~Halodule.wrightii.AreaCover,data = Seagrass_Clippings_By_Site_QAQC)
 summary(HA_lm)
@@ -139,12 +144,12 @@ summary(BlueCarbon_QAQC)
 
 Seagrass_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ 
                           s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Thalassia.testudinum,bs="ts",k=4)+
-                         s(Syringodium.filiforme,bs="ts",k=4)+
-                         s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4)+
+                         # s(Thalassia.testudinum,bs="ts",k=4)+
+                         # s(Syringodium.filiforme,bs="ts",k=4)+
+                         # s(Halodule.wrightii,bs="ts",k=4)+
+                          # s(Thalassia.testudinum.AreaCover,k=4)+
+                          # s(Syringodium.filiforme.AreaCover,k=4)+
+                          # s(Halodule.wrightii.AreaCover,k=4)+
                          as.factor(Factor)+
                          as.factor(TH_PA)+ 
                          as.factor(SY_PA)+ 
@@ -157,115 +162,69 @@ plot.gam(Seagrass_model_Rhiz,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coe
 
 Seagrass_model_Rhiz_2=gam(Rhizome_Stock_g_per_sqm ~ 
                           s(Seagrass_Spp,bs="ts",k=4)+
-                          s(Thalassia.testudinum,bs="ts",k=4)+
-                         s(Syringodium.filiforme,bs="ts",k=4)+
-                         s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4)+
+                         #  s(Thalassia.testudinum,bs="ts",k=4)+
+                         # s(Syringodium.filiforme,bs="ts",k=4)+
+                         # s(Halodule.wrightii,bs="ts",k=4)+
+                          # s(Thalassia.testudinum.AreaCover,k=4)+
+                          # s(Syringodium.filiforme.AreaCover,k=4)+
+                          # s(Halodule.wrightii.AreaCover,k=4)+
                          as.factor(Factor)+
                          as.factor(TH_PA)+ 
-                         # as.factor(SY_PA)+ 
-                         as.factor(HA_PA),data=BlueCarbon_QAQC, method="ML")
+                         as.factor(SY_PA),
+                         # as.factor(HA_PA),
+                         data=BlueCarbon_QAQC, method="ML")
 
 summary(Seagrass_model_Rhiz_2)
 
 
 Seagrass_model_Rhiz_3=gam(Rhizome_Stock_g_per_sqm ~ 
                           s(Seagrass_Spp,bs="ts",k=4)+
-                          s(Thalassia.testudinum,bs="ts",k=4)+
+                         #  s(Thalassia.testudinum,bs="ts",k=4)+
                          # s(Syringodium.filiforme,bs="ts",k=4)+
-                         s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4)+
-                         as.factor(Factor)+
+                         # # s(Halodule.wrightii,bs="ts",k=4)+
+                         #  s(Thalassia.testudinum.AreaCover,k=4)+
+                         #  s(Syringodium.filiforme.AreaCover,k=4)+
+                         #  s(Halodule.wrightii.AreaCover,k=4)+
+                         # as.factor(Factor)+
                          as.factor(TH_PA)+ 
-                         # as.factor(SY_PA)+ 
-                         as.factor(HA_PA),data=BlueCarbon_QAQC, method="ML")
+                         as.factor(SY_PA),
+                         # as.factor(HA_PA),
+                         data=BlueCarbon_QAQC, method="ML")
 
 summary(Seagrass_model_Rhiz_3)
 
 Seagrass_model_Rhiz_4=gam(Rhizome_Stock_g_per_sqm ~ 
                           s(Seagrass_Spp,bs="ts",k=4)+
-                          s(Thalassia.testudinum,bs="ts",k=4)+
+                         #  s(Thalassia.testudinum,bs="ts",k=4)+
                          # s(Syringodium.filiforme,bs="ts",k=4)+
-                         s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4)+
+                         # # s(Halodule.wrightii,bs="ts",k=4)+
+                         #  s(Thalassia.testudinum.AreaCover,k=4)+
+                         #  s(Syringodium.filiforme.AreaCover,k=4)+
+                         #  s(Halodule.wrightii.AreaCover,k=4)+
                          # as.factor(Factor)+
-                         as.factor(TH_PA)+ 
-                         # as.factor(SY_PA)+ 
-                         as.factor(HA_PA),data=BlueCarbon_QAQC, method="ML")
+                         as.factor(TH_PA),
+                         # as.factor(SY_PA), 
+                         # as.factor(HA_PA),
+                         data=BlueCarbon_QAQC, method="ML")
 
 summary(Seagrass_model_Rhiz_4)
 
 
 Seagrass_model_Rhiz_5=gam(Rhizome_Stock_g_per_sqm ~ 
-                          s(Seagrass_Spp,bs="ts",k=4)+
-                          s(Thalassia.testudinum,bs="ts",k=4)+
-                         # s(Syringodium.filiforme,bs="ts",k=4)+
-                         # s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4)+
-                         # as.factor(Factor)+
-                         as.factor(TH_PA)+ 
-                         # as.factor(SY_PA)+ 
-                         as.factor(HA_PA),data=BlueCarbon_QAQC, method="ML")
-
-summary(Seagrass_model_Rhiz_5)
-
-
-Seagrass_model_Rhiz_6=gam(Rhizome_Stock_g_per_sqm ~ 
-                          s(Seagrass_Spp,bs="ts",k=4)+
-                          s(Thalassia.testudinum,bs="ts",k=4)+
-                         # s(Syringodium.filiforme,bs="ts",k=4)+
-                         # s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          # s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4)+
-                         # as.factor(Factor)+
-                         as.factor(TH_PA),
-                         # as.factor(SY_PA)+
-                         data=BlueCarbon_QAQC, method="ML")
-
-summary(Seagrass_model_Rhiz_6)
-
-
-Seagrass_model_Rhiz_7=gam(Rhizome_Stock_g_per_sqm ~ 
-                          s(Seagrass_Spp,bs="ts",k=4)+
-                          s(Thalassia.testudinum,bs="ts",k=4)+
-                         # s(Syringodium.filiforme,bs="ts",k=4)+
-                         # s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          # s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4),
-                         # as.factor(Factor)+
-                         # as.factor(TH_PA),
-                         # as.factor(SY_PA)+
-                         data=BlueCarbon_QAQC, method="ML")
-
-summary(Seagrass_model_Rhiz_7)
-
-
-Seagrass_model_Rhiz_8=gam(Rhizome_Stock_g_per_sqm ~ 
-                          # s(Seagrass_Spp,bs="ts",k=4)+
+                          s(Seagrass_Spp,bs="ts",k=4),
                           # s(Thalassia.testudinum,bs="ts",k=4)+
                          # s(Syringodium.filiforme,bs="ts",k=4)+
                          # s(Halodule.wrightii,bs="ts",k=4)+
-                          s(Thalassia.testudinum.AreaCover,k=4)+
-                          # s(Syringodium.filiforme.AreaCover,k=4)+
-                          s(Halodule.wrightii.AreaCover,k=4),
+                         #  s(Thalassia.testudinum.AreaCover,k=4)+
+                         #  s(Syringodium.filiforme.AreaCover,k=4)+
+                         #  s(Halodule.wrightii.AreaCover,k=4)+
                          # as.factor(Factor)+
-                         # as.factor(TH_PA),
-                         # as.factor(SY_PA)+
+                         # as.factor(TH_PA), 
+                         # as.factor(SY_PA)+ 
+                         # as.factor(HA_PA),
                          data=BlueCarbon_QAQC, method="ML")
 
-summary(Seagrass_model_Rhiz_8)
-
-gam.check(Seagrass_model_Rhiz_8)
+summary(Seagrass_model_Rhiz_5)
 
 
 # Secchi_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
@@ -294,7 +253,7 @@ plot(Silt_model_Rhiz)
 
 Nitrate_Mean_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Nitrate_Mean_model_Rhiz)
-plot(Nitrate_Mean_model_Rhiz,trans=exp)
+plot(Nitrate_Mean_model_Rhiz)
 
 # Par_Mean_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Par.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Par_Mean_model_Rhiz)
@@ -304,9 +263,9 @@ Light_Min_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Light.bottom.Min,bs="ts",k=
 summary(Light_Min_model_Rhiz)
 plot(Light_Min_model_Rhiz)
 
-Dist_To_Shore_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-summary(Dist_To_Shore_model_Rhiz)
-plot(Dist_To_Shore_model_Rhiz)
+# Dist_To_Shore_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_To_Shore_model_Rhiz)
+# plot(Dist_To_Shore_model_Rhiz)
 
 Dist_from_River_Shore_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Dist_from_River_Shore_model_Rhiz)
@@ -326,67 +285,105 @@ summary(SPP_PA_model_Rhiz)
 cor(BlueCarbon_QAQC[c(cont.preds,"Rhizome_Stock_g_per_sqm")],)
 
 full_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ 
-                     as.factor(Factor) +
                      as.factor(TH_PA) +
                      as.factor(SY_PA) +
                      s(Seagrass_Spp,bs="ts",k=4)+
-                      s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+                     s(Dist_To_River,bs="ts",k=4) +
+                     s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4)+
+                    s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
 
 summary(full_model_Rhiz)
 
 
 Rhiz_v1=gam(Rhizome_Stock_g_per_sqm~ 
-                     # as.factor(Factor) +
                      as.factor(TH_PA) +
                      as.factor(SY_PA) +
                      s(Seagrass_Spp,bs="ts",k=4)+
-                                    s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Dist_To_Shore,bs="ts",k=4),
-            data=BlueCarbon_QAQC,method="ML")
+                     s(Dist_To_River,bs="ts",k=4) +
+                     s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
 
 summary(Rhiz_v1)
 
 Rhiz_v2=gam(Rhizome_Stock_g_per_sqm~ 
-                     # as.factor(Factor) +
                      as.factor(TH_PA) +
                      # as.factor(SY_PA) +
                      s(Seagrass_Spp,bs="ts",k=4)+
-                    s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Dist_To_Shore,bs="ts",k=4),
-            data=BlueCarbon_QAQC,method="ML")
+                     s(Dist_To_River,bs="ts",k=4) +
+                     s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
 
 summary(Rhiz_v2)
 
 Rhiz_v3=gam(Rhizome_Stock_g_per_sqm~ 
-                     # as.factor(Factor) +
-                     as.factor(TH_PA) +
+                      as.factor(TH_PA) +
                      # as.factor(SY_PA) +
-                     # s(Seagrass_Spp,bs="ts",k=4)+
-                                  s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Dist_To_Shore,bs="ts",k=4),
-            data=BlueCarbon_QAQC,method="ML")
+                     s(Seagrass_Spp,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4) +
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
 
 summary(Rhiz_v3)
 
 Rhiz_v4=gam(Rhizome_Stock_g_per_sqm~ 
-                     # as.factor(Factor) +
-                     as.factor(TH_PA) +
+                   as.factor(TH_PA) +
                      # as.factor(SY_PA) +
-                     # s(Seagrass_Spp,bs="ts",k=4)+
-              #     s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Dist_To_Shore,bs="ts",k=4),
-                     # s(Dist_To_River,bs="ts",k=4),
-            data=BlueCarbon_QAQC,method="ML")
+                     s(Seagrass_Spp,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4) +
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4),
+                    # s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
 
 summary(Rhiz_v4)
 
-par(mfrow=c(2,1));
-plot.gam(Rhiz_v4,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(Rhiz_v4)[1],all.terms=TRUE,rug=TRUE)
 
-AIC(Seagrass_model_Rhiz_8,Rhiz_v4)
+Rhiz_v5=gam(Rhizome_Stock_g_per_sqm~ 
+                      as.factor(TH_PA) +
+                     # as.factor(SY_PA) +
+                     s(Seagrass_Spp,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4),
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     # s(Nitrate.Mean,bs="ts",k=4),
+                    # s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
 
-gam.check(Rhiz_v4)
+
+summary(Rhiz_v5)
+
+Rhiz_v6=gam(Rhizome_Stock_g_per_sqm~ 
+                    # as.factor(TH_PA) +
+                     # as.factor(SY_PA) +
+                     s(Seagrass_Spp,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4),
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     # s(Nitrate.Mean,bs="ts",k=4),
+                    # s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
+
+summary(Rhiz_v6)
+
+# par(mfrow=c(2,1));
+plot.gam(Rhiz_v6,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(Rhiz_v6)[1],all.terms=TRUE,rug=TRUE)
+
+AIC(Rhiz_v6,full_model_Rhiz)
+
+gam.check(Rhiz_v6)
 gam.check(Seagrass_model_Rhiz_7)
 
 ```
@@ -397,9 +394,6 @@ gam.check(Seagrass_model_Rhiz_7)
 Seagrass_model_LOI=gam(OLOI~ 
                      s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
                      s(Seagrass_Spp,bs="ts",k=4)+
-                     s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Syringodium.filiforme,bs="ts",k=4)+
-                     s(Halodule.wrightii,bs="ts",k=4)+
                      as.factor(Factor)+
                      as.factor(TH_PA)+ 
                      as.factor(SY_PA)+ 
@@ -409,27 +403,22 @@ summary(Seagrass_model_LOI)
 plot.gam(Seagrass_model_LOI,shade=TRUE,shade.col="darkgreen",scheme=2,trans=exp,all.terms=TRUE)
 
 Seagrass_model_LOI_2=gam(OLOI~ 
-                     s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                     # s(Seagrass_Spp,bs="ts",k=4)+
-                     s(Thalassia.testudinum,bs="ts",k=4)+
-                     s(Syringodium.filiforme,bs="ts",k=4)+
-                     s(Halodule.wrightii,bs="ts",k=4)+
+                    s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
+                     s(Seagrass_Spp,bs="ts",k=4)+
                      as.factor(Factor)+
-                     as.factor(TH_PA)+ 
+                     # as.factor(TH_PA)+ 
                      as.factor(SY_PA)+ 
                      as.factor(HA_PA),
                    data=BlueCarbon_QAQC, method="ML")
+
 summary(Seagrass_model_LOI_2)
 plot.gam(Seagrass_model_LOI_2,shade=TRUE,shade.col="darkgreen",scheme=2,trans=exp,all.terms=TRUE)
 
 Seagrass_model_LOI_3=gam(OLOI~ 
-                     s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
+                      s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
                      # s(Seagrass_Spp,bs="ts",k=4)+
-                     s(Thalassia.testudinum,bs="ts",k=4)+
-                     # s(Syringodium.filiforme,bs="ts",k=4)+
-                     s(Halodule.wrightii,bs="ts",k=4)+
                      as.factor(Factor)+
-                     as.factor(TH_PA)+ 
+                     # as.factor(TH_PA)+ 
                      as.factor(SY_PA)+ 
                      as.factor(HA_PA),
                    data=BlueCarbon_QAQC, method="ML")
@@ -438,13 +427,10 @@ plot.gam(Seagrass_model_LOI_3,shade=TRUE,shade.col="darkgreen",scheme=2,trans=ex
 
 
 Seagrass_model_LOI_4=gam(OLOI~ 
-                     # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
+                    s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
                      # s(Seagrass_Spp,bs="ts",k=4)+
-                     s(Thalassia.testudinum,bs="ts",k=4)+
-                     # s(Syringodium.filiforme,bs="ts",k=4)+
-                     s(Halodule.wrightii,bs="ts",k=4)+
                      as.factor(Factor)+
-                     as.factor(TH_PA)+
+                     # as.factor(TH_PA)+ 
                      # as.factor(SY_PA)+ 
                      as.factor(HA_PA),
                    data=BlueCarbon_QAQC, method="ML")
@@ -455,31 +441,15 @@ plot.gam(Seagrass_model_LOI_4,shade=TRUE,shade.col="darkgreen",scheme=2,trans=ex
 Seagrass_model_LOI_5=gam(OLOI~ 
                      s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
                      # s(Seagrass_Spp,bs="ts",k=4)+
-                     # s(Thalassia.testudinum,bs="ts",k=4)+
-                     # s(Syringodium.filiforme,bs="ts",k=4)+
-                     s(Halodule.wrightii,bs="ts",k=4)+
-                     as.factor(Factor)+
-                     as.factor(TH_PA)+
-                     # as.factor(SY_PA)+ 
-                     as.factor(HA_PA),
-                   data=BlueCarbon_QAQC, method="ML")
-summary(Seagrass_model_LOI_5)
-plot.gam(Seagrass_model_LOI_5,shade=TRUE,shade.col="darkgreen",scheme=2,all.terms=TRUE)
-
-
-Seagrass_model_LOI_6=gam(OLOI~ 
-                     # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                     # s(Seagrass_Spp,bs="ts",k=4)+
-                     # s(Thalassia.testudinum,bs="ts",k=4)+
-                     # s(Syringodium.filiforme,bs="ts",k=4)+
-                     s(Halodule.wrightii,bs="ts",k=4)+
                      as.factor(Factor),
-                     # as.factor(TH_PA),
+                     # as.factor(TH_PA)+ 
                      # as.factor(SY_PA)+ 
                      # as.factor(HA_PA),
                    data=BlueCarbon_QAQC, method="ML")
-summary(Seagrass_model_LOI_6)
-plot.gam(Seagrass_model_LOI_6,shade=TRUE,shade.col="darkgreen",scheme=2,all.terms=TRUE)
+summary(Seagrass_model_LOI_5)
+
+plot.gam(Seagrass_model_LOI_5,shade=TRUE,shade.col="darkgreen",scheme=2,all.terms=TRUE)
+
 
 # Rhiz_model_LOI=gam(OLOI~ s(Rhizome_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Rhiz_model_LOI)
@@ -490,13 +460,13 @@ plot.gam(Seagrass_model_LOI_6,shade=TRUE,shade.col="darkgreen",scheme=2,all.term
 # Depth_model_LOI=gam(OLOI~ s(Depth_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Depth_model_LOI)
 
-# Seagrass_Spp_Cover_model_LOI=gam(OLOI~ s(Seagrass_Spp,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-# summary(Seagrass_Spp_Cover_model_LOI)
+Seagrass_Spp_Cover_model_LOI=gam(OLOI~ s(Seagrass_Spp,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Seagrass_Spp_Cover_model_LOI)
 
-# Sand_model_LOI=gam(OLOI~ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-# summary(Sand_model_LOI)
+Sand_model_LOI=gam(OLOI~ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Sand_model_LOI)
 
-Sediment_model_LOI=gam(OLOI~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4) + s(Percent_Sands,bs="ts",k=5), data=BlueCarbon_QAQC,method="ML")
+Sediment_model_LOI=gam(OLOI~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Sediment_model_LOI)
 
 Nitrate_Mean_model_LOI=gam(OLOI~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
@@ -523,36 +493,39 @@ full_model_LOI=gam(OLOI~
                      s(Dist_To_River,bs="ts",k=4) +
                      s(Dist_To_River,by=Factor,bs="ts",k=4) +
                      s(Dist_To_Shore,bs="ts",k=4) +
-                     s(Percent_Sands,bs="ts",k=4) +
                      s(Percent_Silt,bs="ts",k=4) +
                      as.factor(Factor) +
-                     s(Halodule.wrightii,bs="ts",k=4),
+                     s(Rhizome_Stock_g_per_sqm,bs="ts",k=4) +
+                     s(Seagrass_Spp,bs="ts",k=4),
+
                    data=BlueCarbon_QAQC,method="ML")
 summary(full_model_LOI)
 plot.gam(full_model_LOI,shade=TRUE,shade.col="darkgreen",scheme=2,trans=exp,all.terms=TRUE)
 
 LOI_v1=gam(OLOI~ 
-                    # s(Par.Mean,bs="ts",k=4) +
+                     s(Par.Mean,bs="ts",k=4) +
                      s(Dist_To_River,bs="ts",k=4) +
-                     s(Dist_To_River,by=Factor,bs="ts",k=4) +
+                     # s(Dist_To_River,by=Factor,bs="ts",k=4) +
                      s(Dist_To_Shore,bs="ts",k=4) +
-                     s(Percent_Sands,bs="ts",k=4) +
                      s(Percent_Silt,bs="ts",k=4) +
                      as.factor(Factor) +
-                     s(Halodule.wrightii,bs="ts",k=4),
+                     s(Rhizome_Stock_g_per_sqm,bs="ts",k=4) +
+                     s(Seagrass_Spp,bs="ts",k=4),
+
                    data=BlueCarbon_QAQC,method="ML")
 summary(LOI_v1)
 plot.gam(LOI_v1,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(LOI_v1)[1],all.terms=TRUE)
 
 LOI_v2=gam(OLOI~ 
-                  # s(Par.Mean,bs="ts",k=4) +
+                  s(Par.Mean,bs="ts",k=4) +
                      s(Dist_To_River,bs="ts",k=4) +
                      # s(Dist_To_River,by=Factor,bs="ts",k=4) +
                      s(Dist_To_Shore,bs="ts",k=4) +
-                     s(Percent_Sands,bs="ts",k=4) +
                      s(Percent_Silt,bs="ts",k=4) +
                      as.factor(Factor) +
-                     s(Halodule.wrightii,bs="ts",k=4),
+                     # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4) +
+                     s(Seagrass_Spp,bs="ts",k=4),
+
                    data=BlueCarbon_QAQC,method="ML")
 summary(LOI_v2)
 
@@ -561,14 +534,15 @@ plot.gam(LOI_v2,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(LOI_v1)[1],
 
 
 LOI_v3=gam(OLOI~ 
-                     # s(Par.Mean,bs="ts",k=4) +
+                   s(Par.Mean,bs="ts",k=4) +
                      s(Dist_To_River,bs="ts",k=4) +
                      # s(Dist_To_River,by=Factor,bs="ts",k=4) +
                      # s(Dist_To_Shore,bs="ts",k=4) +
-                     # s(Percent_Sands,bs="ts",k=4) +
-                     # s(Percent_Silt,bs="ts",k=4) +
-                     as.factor(Factor),
-                     # s(Halodule.wrightii,bs="ts",k=4),
+                     s(Percent_Silt,bs="ts",k=4) +
+                     as.factor(Factor) +
+                     # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4) +
+                     s(Seagrass_Spp,bs="ts",k=4),
+
                    data=BlueCarbon_QAQC,method="ML")
 summary(LOI_v3)
 
@@ -576,10 +550,39 @@ par(mfrow=c(2,2));
 plot.gam(LOI_v3,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(LOI_v1)[1],all.terms=TRUE)
 
 
-AIC(Seagrass_model_LOI_6,LOI_v3)
+
+LOI_v4=gam(OLOI~ 
+                   # s(Par.Mean,bs="ts",k=4) +
+                     s(Dist_To_River,bs="ts",k=4) +
+                     # s(Dist_To_River,by=Factor,bs="ts",k=4) +
+                     # s(Dist_To_Shore,bs="ts",k=4) +
+                     s(Percent_Silt,bs="ts",k=4) +
+                     as.factor(Factor) +
+                     # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4) +
+                     s(Seagrass_Spp,bs="ts",k=4),
+
+                   data=BlueCarbon_QAQC,method="ML")
+summary(LOI_v4)
+
+
+
+LOI_v5=gam(OLOI~ 
+                   # s(Par.Mean,bs="ts",k=4) +
+                     s(Dist_To_River,bs="ts",k=4) +
+                     # s(Dist_To_River,by=Factor,bs="ts",k=4) +
+                     # s(Dist_To_Shore,bs="ts",k=4) +
+                     s(Percent_Silt,bs="ts",k=4) +
+                     as.factor(Factor),
+                     # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4) +
+                     # s(Seagrass_Spp,bs="ts",k=4),
+
+                   data=BlueCarbon_QAQC,method="ML")
+summary(LOI_v5)
+
+AIC(Seagrass_model_LOI_5,LOI_v5)
 
 par(mfrow=c(2,2));
-plot.gam(LOI_v3,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(LOI_v1)[1],all.terms=TRUE)
+plot.gam(LOI_v5,shade=TRUE,shade.col="darkgreen",scheme=2,all.terms=TRUE)
 
 ```
 
