@@ -658,26 +658,22 @@ BlueCarbon_QAQC%>%
    dplyr::group_by(Region)%>%
    dplyr::summarize(Nitrates=mean(Nitrate.Mean,na.rm=TRUE), Depth=mean(Depth_m,na.rm=TRUE), Secchi_m=mean(Secchi_m,na.rm=TRUE),Dist_To_Shore=mean(Dist_To_Shore,na.rm=TRUE),Dist_To_River=mean(Dist_To_River,na.rm=TRUE),Light=mean(Light.bottom.Min,na.rm=TRUE))
  
-#  
-FWCC_Seagrass_Maps=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/SG_FWC_4_2020.tif")
-names(FWCC_Seagrass_Maps)<-c("FWCC_Seagrass_Maps")
+library(sf)  
+FWCC_Seagrass_Maps=shapefile("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/FWC_Seagrass_Composite_Maps_4_22_2020.shp")
+# names(FWCC_Seagrass_Maps)<-c("FWCC_Seagrass_Maps")
 # 
 coordinates(BlueCarbon_QAQC)<- ~Longitude + Latitude
-# 
-Mapped_points=extract(x=FWCC_Seagrass_Maps,y=BlueCarbon_QAQC)
+proj4string(BlueCarbon_QAQC) <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+## 
+Mapped_points=over(BlueCarbon_QAQC, FWCC_Seagrass_Maps[4]) 
 # 
 FWCC_Seagrass_Extent=as.vector(Mapped_points)
-summary(FWCC_Seagrass_Extent)
 # 
 BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent))
-names(BlueCarbon_QAQC)[36]<-c("FWCC_Seagrass_Extent")
-# 
-BlueCarbon_QAQC=BlueCarbon_QAQC%>%
-  mutate(FWCC_Seagrass_Extent=ifelse(is.na(FWCC_Seagrass_Extent)==TRUE,0,FWCC_Seagrass_Extent))
+names(BlueCarbon_QAQC)[44]<-c("FWCC_Seagrass_Extent")
 # 
 summary(BlueCarbon_QAQC)
 # names(BlueCarbon_QAQC)
-# 
 # 
 summary(as.factor(BlueCarbon_QAQC$FWCC_Seagrass_Extent))
 # 
