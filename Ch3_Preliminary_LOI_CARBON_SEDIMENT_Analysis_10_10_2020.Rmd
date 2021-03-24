@@ -433,7 +433,6 @@ seagrass_survey_AND_Clippings_By_Site=seagrass_survey_AND_Clippings_By_Site%>%
 write.csv(seagrass_survey_AND_Clippings_By_Site,"data_output/Seagrass_Clippings_QAQC_Site_03_18_2021.csv")
 
 
-
 Grainsize_QAQC_By_Site_Quad=Grainsize_QAQC%>%
   group_by(Site,Quadrat)%>%
   dplyr::summarize(Percent_Shell=mean(Percent_Shell,na.rm=TRUE),Percent_Gravel=mean(Percent_Gravel,na.rm=TRUE),Percent_Coarse=mean(Percent_Coarse,na.rm=TRUE),Percent_Medium=mean(Percent_Medium,na.rm=TRUE),Percent_Fine=mean(Percent_Fine,na.rm=TRUE),Percent_Silt=mean(Percent_Silt,na.rm=TRUE))%>%
@@ -457,12 +456,21 @@ BlueCarbon_QAQC=plyr::join(seagrass_survey_AND_Clippings_By_Site,LOI_QAQC_By_Sit
 
 
 BlueCarbon_QAQC=plyr::join(BlueCarbon_QAQC,Grainsize_QAQC_By_Site,by=c("Site"),match="all",type="inner")
+
+
+New_Dist_To_River<-read.csv("arc_output/New_Dist_To_River_Calculation.csv")
+
+BlueCarbon_QAQC=join(BlueCarbon_QAQC,New_Dist_To_River[c(2,5)],by=c("Site"),match="all",type="inner")
+
+BlueCarbon_QAQC$Dist_To_River<-BlueCarbon_QAQC$Dist_To_River_km
+
 names(BlueCarbon_QAQC)
 
-BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+BlueCarbon_QAQC=BlueCarbon_QAQC[c(1:40)]%>%
   mutate(Cover_Level=ifelse(Total_Seagrass_Cover>=50,"high",ifelse(Total_Seagrass_Cover<50 & Total_Seagrass_Cover>5,"low",ifelse(Total_Seagrass_Cover<5,"none", Total_Seagrass_Cover))))%>%
-  mutate(TH_PA=ifelse(Thalassia.testudinum>0,1,0),SY_PA=ifelse(Syringodium.filiforme>0,1,0),HA_PA=ifelse(Halodule.wrightii>0,1,0),TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA))%>%
-  mutate(Factor=ifelse(Cover_Level=="none","Control","Seagrass"))
+  mutate(TH_PA=ifelse(Thalassia.testudinum>0,1,0),SY_PA=ifelse(Syringodium.filiforme>0,1,0),HA_PA=ifelse(Halodule.wrightii>0,1,0),TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA))
+# %>%
+  # mutate(Factor=ifelse(Cover_Level=="none","Control","Seagrass"))
 
 summary(BlueCarbon_QAQC)
 
@@ -661,16 +669,28 @@ BlueCarbon_QAQC%>%
 library(sf)  
 FWCC_Seagrass_Maps=shapefile("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/Raw_Biological_Datasets/FWC_Seagrass_Composite_Maps_4_22_2020.shp")
 # names(FWCC_Seagrass_Maps)<-c("FWCC_Seagrass_Maps")
+
+
+Temperature.Mean=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/data_output/Present.Benthic.Mean.Depth.Temperature.Mean.tif")
+names(Temperature.Mean)<-c("Temperature.Mean")
+
+Primary.productivity.Max=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/data_output/Present.Benthic.Mean.Depth.Primary.productivity.Max.tif")
+names(Primary.productivity.Max)<-c("Primary.productivity.Max")
 # 
 coordinates(BlueCarbon_QAQC)<- ~Longitude + Latitude
 proj4string(BlueCarbon_QAQC) <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
 ## 
 Mapped_points=over(BlueCarbon_QAQC, FWCC_Seagrass_Maps[4]) 
+Temperature.Mean.pts=extract(x=Temperature.Mean,y=BlueCarbon_QAQC)
+PPM.pts=extract(x=Primary.productivity.Max,y=BlueCarbon_QAQC)
+
 # 
 FWCC_Seagrass_Extent=as.vector(Mapped_points)
-# 
-BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent))
-names(BlueCarbon_QAQC)[44]<-c("FWCC_Seagrass_Extent")
+Temperature.Mean.pts=as.data.frame(Temperature.Mean.pts)
+PPM.pts=as.data.frame(PPM.pts)
+
+BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent,Temperature.Mean.pts,PPM.pts))
+names(BlueCarbon_QAQC)[42:44]<-c("FWCC_Seagrass_Extent","Temperature.Mean","Primary.productivity.Max")
 # 
 summary(BlueCarbon_QAQC)
 # names(BlueCarbon_QAQC)
