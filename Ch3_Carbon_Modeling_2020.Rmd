@@ -41,99 +41,84 @@ BlueCarbon_QAQC=BlueCarbon_QAQC%>%
          Secchi_m=ifelse(Region=="Saint Marks" & is.na(Secchi_m)==TRUE,0.401,Secchi_m))
 
 
-BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(Thalassia.testudinum.AreaCover=(Thalassia.testudinum/100 *Total_Seagrass_Cover/100)*100,
+         Syringodium.filiforme.AreaCover=(Syringodium.filiforme/100 * Total_Seagrass_Cover/100)*100,
+         Halodule.wrightii.AreaCover=(Halodule.wrightii/100 * Total_Seagrass_Cover/100)*100)
 
-# BlueCarbon_QAQC=BlueCarbon_QAQC%>%
-#   mutate(Dist_To_River=ifelse(Dist_To_River>10,10,Dist_To_River))
+BlueCarbon_QAQC<-BlueCarbon_QAQC%>%
+  mutate_at(vars(Seagrass_Biomass_g_per_sqm , Macro_Algae_Biomass_g_per_sqm, Thalassia_testudinum_g_per_sqm ,Syringodium_filiforme_g_per_sqm,Halodule_wrightii_g_per_sqm), ~replace_na(., 0))
+
+
+BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
 
 
 #Modeling Variables
-cat.preds=c("TH_PA","SY_PA","HA_PA","Factor")
-null.vars=c("Region","Site")
-cont.preds=c("Depth_m","Dist_To_Shore","Dist_To_River","Nitrate.Mean",
-             "Par.Mean","Light.bottom.Min",
-             "Rhizome_Stock_g_per_sqm",
-             "Thalassia.testudinum", "Syringodium.filiforme",
-             "Halodule.wrightii","Seagrass_Spp",
-             "Percent_Coarse","Percent_Medium","Percent_Fine","Percent_Silt")
-
-cor(BlueCarbon_QAQC[cont.preds],)
-
+# cat.preds=c("TH_PA","SY_PA","HA_PA","Factor")
+# null.vars=c("Region","Site")
+# cont.preds=c("Depth_m", "Dist_To_Shore", "Dist_To_River", "Nitrate.Mean",
+#              "Par.Mean", "Light.bottom.Min",
+#              "Rhizome_Stock_g_per_sqm",
+#              "Seagrass_Biomass_g_per_sqm",
+#              "Total_Seagrass_Cover","Total_Algae_Cover",
+#              "Thalassia.testudinum, Syringodium.filiforme",
+#              "Halodule.wrightii",
+#              "Percent_Gravel", "Percent_Coarse", "Percent_Medium", "Percent_Fine", "Percent_Silt")
 
 ```
 
 #GAMs for Biomass Stocks
 ```{r}
-Seagrass_Clippings_By_Site_QAQC=seagrass_survey_AND_Clippings_By_Site%>%
-  mutate(Site=as.character(Site))%>%
-  dplyr::mutate(Factor=ifelse(Site=="SJBA" | Site=="SJBB" | Site=="SJBC" | Site=="SMARA" | Site=="SMARB" | Site=="SMARC" | Site=="STCHA" |Site=="STCHB" |Site=="STCHC"  ,"Control","Seagrass"))%>%
-  mutate(Factor=as.factor(Factor))%>%
-  mutate(Thalassia.testudinum.AreaCover=(Thalassia.testudinum/100 *Seagrass_Spp/100)*100,
-         Syringodium.filiforme.AreaCover=(Syringodium.filiforme/100 * Seagrass_Spp/100)*100,
-         Halodule.wrightii.AreaCover=(Halodule.wrightii/100 * Seagrass_Spp/100)*100)%>%
-  mutate(Syringodium_filiforme_gDW=ifelse(Syringodium_filiforme_gDW>4,0.4,Syringodium_filiforme_gDW))
 
-Seagrass_Clippings_By_Site_QAQC[is.na(Seagrass_Clippings_By_Site_QAQC)]<-0
+ggplot(BlueCarbon_QAQC,aes(x=Total_Seagrass_Cover)) + geom_histogram(bins=25) + ylab("Number of Sites")+ xlab("Total Seagrass Cover (%)")
+
+ggplot(BlueCarbon_QAQC,aes(x=Seagrass_Biomass_g_per_sqm)) + geom_histogram(bins=15) + ylab("Number of Sites")+ xlab("Seagrass Biomass (g/sqm)")
 
 
-summary(Seagrass_Clippings_By_Site_QAQC)
+ggplot(BlueCarbon_QAQC,aes(x=Total_Seagrass_Cover,y=Seagrass_Biomass_g_per_sqm)) + geom_point()+geom_smooth(method="gam")
 
-# Seagrass_Clippings_By_Site_QAQC=Seagrass_Clippings_By_Site_QAQC[complete.cases(Seagrass_Clippings_By_Site_QAQC),]
+ggplot(BlueCarbon_QAQC,aes(x=Thalassia.testudinum.AreaCover,y=Thalassia_testudinum_g_per_sqm)) + geom_point() +geom_smooth(method="gam")
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Seagrass_Spp)) + geom_histogram(bins=25) + ylab("Number of Sites")+ xlab("Total Seagrass Cover (%)")
-
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Seagrass_Biomass_gDW)) + geom_histogram(bins=15) + ylab("Number of Sites")+ xlab("Seagrass Biomass (gDW)")
-
-
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(y=Seagrass_Biomass_gDW,x=Factor,fill=Factor)) + geom_boxplot()
-
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Seagrass_Spp,y=Seagrass_Biomass_gDW)) + geom_point()+geom_smooth(method="gam")
-
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Thalassia.testudinum.AreaCover,y=Thalassia_testudinum_gDW)) + geom_point() +geom_smooth(method="gam")
-
-TH_lm=lm(Thalassia_testudinum_gDW~Thalassia.testudinum.AreaCover,data = Seagrass_Clippings_By_Site_QAQC)
+TH_lm=lm(Thalassia_testudinum_g_per_sqm~Thalassia.testudinum.AreaCover,data = BlueCarbon_QAQC)
 summary(TH_lm)
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Syringodium.filiforme.AreaCover,y=Syringodium_filiforme_gDW)) + geom_point()+geom_smooth(method="gam")
+ggplot(BlueCarbon_QAQC,aes(x=Syringodium.filiforme.AreaCover,y=Syringodium_filiforme_g_per_sqm)) + geom_point() +geom_smooth(method="gam")
 
-SY_lm=lm(Syringodium_filiforme_gDW~Syringodium.filiforme.AreaCover,data = Seagrass_Clippings_By_Site_QAQC)
+SY_lm=lm(Syringodium_filiforme_g_per_sqm~Syringodium.filiforme.AreaCover,data = BlueCarbon_QAQC)
 summary(SY_lm)
 
-ggplot(Seagrass_Clippings_By_Site_QAQC,aes(x=Halodule.wrightii.AreaCover,y=Halodule_wrightii_gDW)) + geom_point() +geom_smooth(method="gam")
+ggplot(BlueCarbon_QAQC,aes(x=Halodule.wrightii.AreaCover,y=Halodule_wrightii_g_per_sqm)) + geom_point() +geom_smooth(method="gam")
 
-HA_lm=lm(Halodule_wrightii_gDW~Halodule.wrightii.AreaCover,data = Seagrass_Clippings_By_Site_QAQC)
+HA_lm=lm(Halodule_wrightii_g_per_sqm~Halodule.wrightii.AreaCover,data = BlueCarbon_QAQC)
 summary(HA_lm)
 
 
-Seagrass_Clippings_By_Site_QAQC%>%
+BlueCarbon_QAQC%>%
   # mutate(TH_PA=as.factor(TH_PA))%>%
-  ggplot(aes(y=Seagrass_Biomass_gDW)) + geom_boxplot()
+  ggplot(aes(y=Seagrass_Biomass_g_per_sqm)) + geom_boxplot()
 
 
-Seagrass_Clippings_By_Site_QAQC%>%
+BlueCarbon_QAQC%>%
   # mutate(TH_PA=as.factor(TH_PA))%>%
-  ggplot(aes(y=Macro_Algae_Biomass_gDW)) + geom_boxplot()
+  ggplot(aes(y=Macro_Algae_Biomass_g_per_sqm)) + geom_boxplot()
 
 
-Seagrass_Clippings_By_Site_QAQC%>%
+BlueCarbon_QAQC%>%
   # mutate(TH_PA=as.factor(TH_PA))%>%
-  ggplot(aes(y=Thalassia_testudinum_gDW)) + geom_boxplot()
+  ggplot(aes(y=Thalassia_testudinum_g_per_sqm)) + geom_boxplot()
 
 
-Seagrass_Clippings_By_Site_QAQC%>%
+BlueCarbon_QAQC%>%
   # mutate(TH_PA=as.factor(TH_PA))%>%
-  ggplot(aes(y=Syringodium_filiforme_gDW)) + geom_boxplot()
+  ggplot(aes(y=Syringodium_filiforme_g_per_sqm)) + geom_boxplot()
 
 
-Seagrass_Clippings_By_Site_QAQC%>%
+BlueCarbon_QAQC%>%
   # mutate(TH_PA=as.factor(TH_PA))%>%
-  ggplot(aes(y=Halodule_wrightii_gDW)) + geom_boxplot()
+  ggplot(aes(y=Halodule_wrightii_g_per_sqm)) + geom_boxplot()
 
 
-names(Seagrass_Clippings_By_Site_QAQC)
-
-
-BlueCarbon_QAQC=join(BlueCarbon_QAQC,Seagrass_Clippings_By_Site_QAQC[c(2,20:28)],by="Site")
+names(BlueCarbon_QAQC)
 
 ```
 
@@ -144,7 +129,7 @@ names(BlueCarbon_QAQC)
 summary(BlueCarbon_QAQC)
 
 Seagrass_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ 
-                          s(Seagrass_Spp,bs="ts",k=4)+
+                          s(Total_Seagrass_Cover,bs="ts",k=4)+
                          # s(Thalassia.testudinum,bs="ts",k=4)+
                          # s(Syringodium.filiforme,bs="ts",k=4)+
                          # s(Halodule.wrightii,bs="ts",k=4)+
@@ -1215,8 +1200,9 @@ gam.check(OC_gam_base)
 ##################################################################################
 cat.preds=c("TH_PA","SY_PA","HA_PA","Factor")
 null.vars=c("Region","Site")
-cont.preds=c("Depth_m","Dist_To_Shore","Dist_To_River","Nitrate.Mean",
-             "Rhizome_Stock_g_per_sqm","Seagrass_Spp","Percent_Gravel",
+cont.preds=c("Depth_m","Dist_To_Shore","Dist_To_River","Nitrate.Mean", "Par.Mean",
+             "Rhizome_Stock_g_per_sqm", "Seagrass_Biomass_g_per_sqm", "Total_Seagrass_Cover",
+             "Percent_Gravel",
              "Percent_Sands","Percent_Silt")
 
 
