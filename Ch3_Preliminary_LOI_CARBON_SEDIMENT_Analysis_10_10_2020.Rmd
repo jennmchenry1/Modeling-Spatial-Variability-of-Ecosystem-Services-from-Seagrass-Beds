@@ -470,7 +470,7 @@ BlueCarbon_QAQC$Dist_To_River<-BlueCarbon_QAQC$Dist_To_River_km
 
 names(BlueCarbon_QAQC)
 
-BlueCarbon_QAQC=BlueCarbon_QAQC[c(1:41)]%>%
+BlueCarbon_QAQC=BlueCarbon_QAQC[c(1:43)]%>%
   mutate(Cover_Level=ifelse(Total_Seagrass_Cover>=50,"high",ifelse(Total_Seagrass_Cover<50 & Total_Seagrass_Cover>5,"low",ifelse(Total_Seagrass_Cover<5,"none", Total_Seagrass_Cover))))%>%
   mutate(TH_PA=ifelse(Thalassia.testudinum>0,1,0),SY_PA=ifelse(Syringodium.filiforme>0,1,0),HA_PA=ifelse(Halodule.wrightii>0,1,0),TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA))
 # %>%
@@ -694,7 +694,7 @@ Temperature.Mean.pts=as.data.frame(Temperature.Mean.pts)
 PPM.pts=as.data.frame(PPM.pts)
 
 BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent,Temperature.Mean.pts,PPM.pts))
-names(BlueCarbon_QAQC)[43:45]<-c("FWCC_Seagrass_Extent","Temperature.Mean","Primary.productivity.Max")
+names(BlueCarbon_QAQC)[45:47]<-c("FWCC_Seagrass_Extent","Temperature.Mean","Primary.productivity.Max")
 # 
 summary(BlueCarbon_QAQC)
 # names(BlueCarbon_QAQC)
