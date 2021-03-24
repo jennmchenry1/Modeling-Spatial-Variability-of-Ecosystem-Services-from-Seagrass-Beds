@@ -290,6 +290,18 @@ AIC(full_model_Rhiz,stepwise_model_Rhiz)
 
 gam.check(stepwise_model_Rhiz)
 
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Primary.productivity.Max,fill=Region))+geom_boxplot()
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Dist_To_River,fill=Region))+geom_boxplot()
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Nitrate.Mean,fill=Region))+geom_boxplot()
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Salinity.Min,fill=Region))+geom_boxplot()
+
 ```
 
 
@@ -405,77 +417,6 @@ shapiro.test(stepwise_model_OCD$residuals)
 
 #GAM Carbonate Stock
 ```{r}
-Seagrass_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ 
-                         s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                         as.factor(Factor)+
-                         as.factor(TH_PA)+ 
-                         as.factor(SY_PA)+ 
-                         as.factor(HA_PA),
-                       data=BlueCarbon_QAQC, method="ML")
-
-summary(Seagrass_model_In)
-
-
-Seagrass_model_In_2=gam((Inorganic_Carbon_Stock_g_per_sqm)~ 
-                         # s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                         as.factor(Factor)+
-                         as.factor(TH_PA)+ 
-                         as.factor(SY_PA)+
-                         as.factor(HA_PA),
-                       data=BlueCarbon_QAQC, method="ML")
-
-summary(Seagrass_model_In_2)
-
-
-Seagrass_model_In_3=gam((Inorganic_Carbon_Stock_g_per_sqm)~ 
-                         # s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                         as.factor(Factor)+
-                         as.factor(TH_PA)+ 
-                         as.factor(SY_PA),
-                         # as.factor(HA_PA),
-                       data=BlueCarbon_QAQC, method="ML")
-
-
-summary(Seagrass_model_In_3)
-
-Seagrass_model_In_4=gam((Inorganic_Carbon_Stock_g_per_sqm)~ 
-                         # s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                         as.factor(Factor)+
-                         as.factor(TH_PA), 
-                         # as.factor(SY_PA),
-                         # as.factor(HA_PA),
-                       data=BlueCarbon_QAQC, method="ML")
-
-
-summary(Seagrass_model_In_4)
-
-
-Seagrass_model_In_5=gam((Inorganic_Carbon_Stock_g_per_sqm)~ 
-                         # s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                         # as.factor(Factor)+
-                         as.factor(TH_PA),
-                         # as.factor(SY_PA),
-                         # as.factor(HA_PA),
-                       data=BlueCarbon_QAQC, method="ML")
-summary(Seagrass_model_In_5)
-
-
-Seagrass_model_In_6=gam((Inorganic_Carbon_Stock_g_per_sqm)~ 
-                         # s(Seagrass_Spp,bs="ts",k=4)+
-                         s(Rhizome_Stock_g_per_sqm,bs="ts",k=4),
-                         # as.factor(Factor)+
-                         # as.factor(TH_PA),
-                         # as.factor(SY_PA),
-                         # as.factor(HA_PA),
-                       data=BlueCarbon_QAQC, method="ML")
-summary(Seagrass_model_In_6)
-
-gam.check(Seagrass_model_In_6)
 
 
 # Secchi_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
@@ -484,11 +425,21 @@ gam.check(Seagrass_model_In_6)
 # Depth_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Depth_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Depth_model_In)
 #  
-# Seagrass_Spp_Cover_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~  s(Seagrass_Spp,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+# Seagrass_Cover_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~ s(Total_Seagrass_Cover,bs="ts",k=4) + s(Total_Algae_Cover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Seagrass_Cover_model_In)
+
+# SPP_PA_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ TH_PA + HA_PA +SY_PA, data=BlueCarbon_QAQC,method="ML")
+# summary(SPP_PA_model_In)
+
+# Seagrass_Spp_Cover_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~ s(Thalassia.testudinum.AreaCover,bs="ts",k=4) + s(Syringodium.filiforme.AreaCover,bs="ts",k=4) + s(Halodule.wrightii.AreaCover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# 
 # summary(Seagrass_Spp_Cover_model_In)
 
-# Sand_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~  s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-# summary(Sand_model_In)
+
+Seagrass_Biomass_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~ s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4) + s(Rhizome_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+summary(Seagrass_Biomass_model_In)
 
 Sediment_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4)
                       , data=BlueCarbon_QAQC,method="ML")
@@ -496,6 +447,16 @@ summary(Sediment_model_In)
 
 Nitrate_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Nitrate_Mean_model_In)
+
+# Salinity_min_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Salinity_min_model_In)
+
+PP_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(PP_model_In)
+
+Temperature_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Temperature_Mean_model_In)
+
 
 Par_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Par.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Par_Mean_model_In)
@@ -506,24 +467,24 @@ summary(Light_Min_model_In)
 # Dist_To_Shore_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Dist_To_Shore_model_In)
 
-Dist_from_River_Shore_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-summary(Dist_from_River_Shore_model_In)
+# Dist_from_River_Shore_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_from_River_Shore_model_In)
 
-Treatment_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Dist_To_River,by=Factor,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-summary(Treatment_Mean_model_In)
+# Treatment_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Dist_To_River,by=Factor,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Treatment_Mean_model_In)
 
 Rhizomes_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Rhizome_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Rhizomes_model_In)
 
 
-SPP_PA_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ TH_PA + HA_PA +SY_PA, data=BlueCarbon_QAQC,method="ML")
-summary(SPP_PA_model_In)
 
 cor(BlueCarbon_QAQC[c(cont.preds,"Inorganic_Carbon_Stock_g_per_sqm")],)
 
 full_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                    s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
+                    # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4)+
+                      s(Primary.productivity.Max,bs="ts",k=4)+
+     s(Temperature.Mean,bs="ts",k=4)+
                   s(Par.Mean,bs="ts",k=4)+
                      s(Light.bottom.Min,bs="ts",k=4)+
                      s(Percent_Gravel,bs="ts",k=4)+
@@ -531,105 +492,32 @@ full_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~
                     s(Percent_Fine,bs="ts",k=4) +
                     s(Percent_Silt,bs="ts",k=4)+
                      s(Dist_To_River,bs="ts",k=4)+
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
                      as.factor(Factor), 
                      data=BlueCarbon_QAQC,method="ML")
 
 summary(full_model_In)
 
-plot.gam(full_model_In,shade=TRUE,shade.col="darkgreen",scheme=2,shift=coef(full_model_In)[1],all.terms=TRUE)
 
-v1_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                   s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                   s(Nitrate.Mean,bs="ts",k=4)+
-                   # s(Par.Mean,bs="ts",k=4)+
-                   s(Light.bottom.Min,bs="ts",k=4)+
-                    s(Percent_Gravel,bs="ts",k=4)+
-                    s(Percent_Medium,bs="ts",k=4)+
-                    s(Percent_Fine,bs="ts",k=4) +
-                    s(Percent_Silt,bs="ts",k=4)+
-                     s(Dist_To_River,bs="ts",k=4)+
-                     as.factor(Factor), 
-                     data=BlueCarbon_QAQC,method="ML")
-
-summary(v1_In)
-
-v2_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                        s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                   s(Nitrate.Mean,bs="ts",k=4)+
-                   # s(Par.Mean,bs="ts",k=4)+
-                   s(Light.bottom.Min,bs="ts",k=4)+
-                    s(Percent_Gravel,bs="ts",k=4)+
-                    s(Percent_Medium,bs="ts",k=4)+
-                    s(Percent_Fine,bs="ts",k=4) +
-                    s(Percent_Silt,bs="ts",k=4)+
+stepwise_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
+                    # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                      # s(Primary.productivity.Max,bs="ts",k=4)+
+     # s(Temperature.Mean,bs="ts",k=4)+
+                  # s(Par.Mean,bs="ts",k=4)+
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Percent_Gravel,bs="ts",k=4)+
+                    # s(Percent_Medium,bs="ts",k=4)+
+                    # s(Percent_Fine,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
                      # s(Dist_To_River,bs="ts",k=4)+
-                     as.factor(Factor), 
+                    # s(Total_Seagrass_Cover,bs="ts",k=4),
+                     # Factor,
                      data=BlueCarbon_QAQC,method="ML")
-summary(v2_In)
 
+summary(stepwise_model_In)
 
-par(mfrow=c(2,3));
-plot.gam(v2_In,shade=TRUE,shade.col="darkgreen",shift=coef(v2_In)[1],scheme=2,all.terms=TRUE)
-
-gam.check(v2_In)
-
-
-
-v3_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                   s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                   s(Nitrate.Mean,bs="ts",k=4)+
-                   # s(Par.Mean,bs="ts",k=4)+
-                   # s(Light.bottom.Min,bs="ts",k=4)+
-                   s(Percent_Gravel,bs="ts",k=4)+
-                   s(Percent_Medium,bs="ts",k=4)+
-                   s(Percent_Fine,bs="ts",k=4) +
-                   s(Percent_Silt,bs="ts",k=4)+
-                   # s(Dist_To_River,bs="ts",k=4)+
-                   as.factor(Factor), 
-                   data=BlueCarbon_QAQC,method="ML")
-summary(v3_In)
-
-
-v4_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                   s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                   s(Nitrate.Mean,bs="ts",k=4)+
-                   # s(Par.Mean,bs="ts",k=4)+
-                   # s(Light.bottom.Min,bs="ts",k=4)+
-                   s(Percent_Gravel,bs="ts",k=4)+
-                   s(Percent_Medium,bs="ts",k=4)+
-                   s(Percent_Fine,bs="ts",k=4) +
-                   s(Percent_Silt,bs="ts",k=4),
-                   # s(Dist_To_River,bs="ts",k=4)+
-                   # as.factor(Factor), 
-                   data=BlueCarbon_QAQC,method="ML")
-summary(v4_In)
-
-
-v5_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                   # s(Rhizome_Stock_g_per_sqm,bs="ts",k=4)+
-                   s(Nitrate.Mean,bs="ts",k=4)+
-                   # s(Par.Mean,bs="ts",k=4)+
-                   # s(Light.bottom.Min,bs="ts",k=4)+
-                   s(Percent_Gravel,bs="ts",k=4)+
-                   # s(Percent_Medium,bs="ts",k=4)+
-                   # s(Percent_Fine,bs="ts",k=4) +
-                   s(Percent_Silt,bs="ts",k=4),
-                   # s(Dist_To_River,bs="ts",k=4)+
-                   # as.factor(Factor),
-                   data=BlueCarbon_QAQC,method="ML")
-summary(v5_In)
-gam.check(v5_In)
-AIC(Seagrass_model_In_6,v3_In,v5_In)
-
-par(mfrow=c(2,3));
-plot.gam(v5_In,shade=TRUE,shade.col="darkgreen",shift=coef(v3_In)[1],scheme=2,all.terms=TRUE)
-
-summary(Seagrass_model_In_8)
-summary(v3_In)
-
-
-coef(Seagrass_model_In_8)
-coef(v3_In)
+draw(stepwise_model_In)
 
 save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Modeling_Spring2021.RData")
 
