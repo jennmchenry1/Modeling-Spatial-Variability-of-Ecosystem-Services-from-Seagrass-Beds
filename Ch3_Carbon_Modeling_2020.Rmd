@@ -108,6 +108,11 @@ summary(Seagrass_Spp_Cover_model_BIOMASS)
 Salinity_min_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Salinity_min_model_BIOMASS)
 
+
+Current_velocity_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Current_velocity_model_BIOMASS)
+
+
 # PP_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(PP_model_BIOMASS)
 
@@ -140,7 +145,8 @@ cor(BlueCarbon_QAQC[c(cont.preds,"Organic_Carbon_Stock_g_per_sqm")],)
 full_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~
     s(Depth_m,bs="ts",k=4)   +
      s(Salinity.Min,bs="ts",k=4)   +
-    s(Primary.productivity.Max,bs="ts",k=4)+
+    # s(Primary.productivity.Max,bs="ts",k=4)+
+     s(Current.Velocity.Max,bs="ts",k=4)+
      s(Temperature.Mean,bs="ts",k=4)+
     s(Light.bottom.Min,bs="ts",k=4)   +
     s(Nitrate.Mean,bs="ts",k=4)   +
@@ -163,13 +169,14 @@ stepwise_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~
     # s(Depth_m,bs="ts",k=4)   +
      # s(Salinity.Min,bs="ts",k=4)   +
     # s(Primary.productivity.Max,bs="ts",k=4)+
+     # s(Current.Velocity.Max,bs="ts",k=4)+
      # s(Temperature.Mean,bs="ts",k=4)+
     s(Light.bottom.Min,bs="ts",k=4)   +
     # s(Nitrate.Mean,bs="ts",k=4)   +
     # s(Dist_To_River,bs="ts",k=4)   +
     s(Total_Seagrass_Cover,bs="ts",k=4) + 
       s(Total_Algae_Cover,bs="ts",k=4)   + 
-      # s(Epiphyte_Load,bs="ts",k=4)+
+      # s(Epiphite_Shoot_Load,bs="ts",k=4)+
                       # as.factor(Factor) +
       # Meadow.Structure+
       # SY_PA+
@@ -241,6 +248,9 @@ plot(Nitrate_Mean_model_Rhiz)
 Salinity_min_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Salinity_min_model_Rhiz)
 
+Current_velocity_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Current_velocity_model_Rhiz)
+
 PP_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(PP_model_Rhiz)
 
@@ -279,6 +289,7 @@ full_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~
                       # Meadow.Structure+
                      s(Total_Seagrass_Cover,bs="ts",k=4)+   
                     s(Epiphyte_Load,bs="ts",k=4)+
+                        s(Current.Velocity.Max,bs="ts",k=4)+
                      s(Dist_To_River,bs="ts",k=4) +
                      s(Light.bottom.Min,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4)+
@@ -293,13 +304,18 @@ summary(full_model_Rhiz)
 
 
 stepwise_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ 
-     s(Total_Seagrass_Cover,bs="ts",k=4)+   
+      #  (HA_PA)+
+                     # (TH_PA) +
+                     #       (SY_PA) +
+                      # Meadow.Structure+
+                     s(Total_Seagrass_Cover,bs="ts",k=4)+   
                     # s(Epiphyte_Load,bs="ts",k=4)+
+                        s(Current.Velocity.Max,bs="ts",k=4)+
                      # s(Dist_To_River,bs="ts",k=4) +
                      # s(Light.bottom.Min,bs="ts",k=4)+
                      # s(Nitrate.Mean,bs="ts",k=4)+
-                      s(Salinity.Min,bs="ts",k=4)   +
-    s(Primary.productivity.Max,bs="ts",k=4),
+                      s(Salinity.Min,bs="ts",k=4),
+    # s(Dist_To_River,bs="ts",k=4),
      # s(Temperature.Mean,bs="ts",k=4),
                     # s(Percent_Silt,bs="ts",k=4),
                     # s(Depth_m,bs="ts",k=4),
@@ -374,6 +390,10 @@ summary(Salinity_min_model_OCD)
 PP_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(PP_model_OCD)
 
+CV_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(CV_model_OCD)
+
+
 Temperature_Mean_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Temperature_Mean_model_OCD)
 
@@ -404,7 +424,8 @@ full_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~
                      s(Dist_To_Shore,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4) +
                        s(Salinity.Min,bs="ts",k=4)+
-    s(Primary.productivity.Max,bs="ts",k=4)+
+                     s(Current.Velocity.Max,bs="ts",k=4)+
+    # s(Primary.productivity.Max,bs="ts",k=4)+
      s(Temperature.Mean,bs="ts",k=4)+
                      s(Dist_To_River,bs="ts",k=4) +
                      s(Percent_Silt,bs="ts",k=4) + 
@@ -419,20 +440,20 @@ full_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~
 summary(full_model_OCD)
 
 stepwise_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ 
-                           s(Par.Mean,bs="ts",k=4)+
-                      # s(Epiphyte_Load,bs="ts",k=4)+
+                      s(Par.Mean,bs="ts",k=4)+
                      # s(Dist_To_Shore,bs="ts",k=4)+
-                     s(Nitrate.Mean,bs="ts",k=4) +
+                     # s(Nitrate.Mean,bs="ts",k=4) +
                        # s(Salinity.Min,bs="ts",k=4)+
+                     s(Current.Velocity.Max,bs="ts",k=4)+
     # s(Primary.productivity.Max,bs="ts",k=4)+
      # s(Temperature.Mean,bs="ts",k=4)+
                      s(Dist_To_River,bs="ts",k=4) +
                      s(Percent_Silt,bs="ts",k=4) + 
                      # s(Light.bottom.Min,bs="ts",k=4)+
                       # s(Depth_m,bs="ts",k=4)+
-      # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+      # s(Total_Seagrass_Cover,bs="ts",k=4)+
       Meadow.Type,
-                     # Factor +
+                       # Factor ,
                      # SY_PA,
                    data=BlueCarbon_QAQC,method="ML")
 
@@ -501,6 +522,10 @@ summary(Nitrate_Mean_model_In)
 PP_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(PP_model_In)
 
+
+CV_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(CV_Mean_model_In)
+
 Temperature_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Temperature_Mean_model_In)
 
@@ -531,7 +556,8 @@ full_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~
                     s(Epiphyte_Load,bs="ts",k=4)+
                     s(Shell_Stock_g_per_sqm,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4)+
-                      s(Primary.productivity.Max,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                      # s(Primary.productivity.Max,bs="ts",k=4)+
      s(Temperature.Mean,bs="ts",k=4)+
                   s(Par.Mean,bs="ts",k=4)+
                      s(Light.bottom.Min,bs="ts",k=4)+
@@ -547,9 +573,10 @@ summary(full_model_In)
 
 
 stepwise_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                    # s(Epiphyte_Load,bs="ts",k=4)+
+               # s(Epiphyte_Load,bs="ts",k=4)+
                     # s(Shell_Stock_g_per_sqm,bs="ts",k=4)+
-                     s(Nitrate.Mean,bs="ts",k=4)+
+                     # s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
                       # s(Primary.productivity.Max,bs="ts",k=4)+
      # s(Temperature.Mean,bs="ts",k=4)+
                   # s(Par.Mean,bs="ts",k=4)+
@@ -557,16 +584,15 @@ stepwise_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~
                      s(Percent_Gravel,bs="ts",k=4)+
                     # s(Percent_Fine,bs="ts",k=4) +
                     s(Percent_Silt,bs="ts",k=4),
-                     # s(Dist_To_River,bs="ts",k=4),
                     # s(Total_Seagrass_Cover,bs="ts",k=4),
-                     # Factor, 
-                     data=BlueCarbon_QAQC,method="ML")                   
-
+                     # Meadow.Type,
+                     data=BlueCarbon_QAQC,method="ML")
 
 summary(stepwise_model_In)
 
-
 draw(stepwise_model_In)
+
+gam.check(stepwise_model_In)
 
 save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Modeling_Spring2021.RData")
 

@@ -111,6 +111,8 @@ levels(as.factor(LOI$Quadrat))
 
 ## GOTTA CHECK THE CALCULATIONS REALLY CLOSELY. I THINK WE NEED TO MULTIPLY PERCENTAGES BY GRAMS BEFORE DIVDING BY THE CORRECTED VOLUME.
 # RIGHT NOW I'M CALCULATING DENSITIES AND THEN MULTIPLYING THE PERCENTAGES
+df=as.data.frame(LOI_QAQC[c(1:13,32)])
+
 
 LOI_QAQC=LOI%>%
   dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*Compaction_Ratio),Slice_Area_cm2=pi*(2.54^2),Slice_Volume_cm3=Slice_Area_cm2*Slice_Height_Corrected_cm)%>%
@@ -127,7 +129,7 @@ LOI_QAQC=LOI%>%
     dplyr::mutate(Factor=ifelse(Site=="SJBA" | Site=="SJBB" | Site=="SJBC" | Site=="SMARA" | Site=="SMARB" | Site=="SMARC" | Site=="STCHA" |Site=="STCHB" |Site=="STCHC"  ,"Control","Seagrass"),
          Percent_Carbon=(0.4839*OLOI)-0.3648,
          Percent_Carbon=ifelse(Percent_Carbon<0,0.001,Percent_Carbon))%>%
-  dplyr::mutate(Sediment_Depth_cm=Slice_Height_Corrected_cm*Slice_Number,
+  dplyr::mutate(Sediment_Depth_cm=(Slice_Number*2)*Compaction_Ratio,
          Sediment_Depth_Group=ifelse(Sediment_Depth_cm<=10,"0-10cm",ifelse(Sediment_Depth_cm>10 & Sediment_Depth_cm<=20,"10-20cm",ifelse(Sediment_Depth_cm>20 & Sediment_Depth_cm<=30,"20-30cm","below30cm"))))%>%
   dplyr::select(1:13,18:19,22:23,26:33)
 
@@ -163,14 +165,14 @@ levels(Grainsize_QAQC$Site)
 
 Grainsize_QAQC=Grainsize_QAQC%>%
   # mutate(Rhizome_Removed=ifelse(Slice_Number==4,"Y","N"))%>%
-  dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*Compaction_Ratio),Slice_Area_cm2=pi*(2.54^2),Slice_Volume_cm3=Slice_Area_cm2*Slice_Height_Corrected_cm)%>%
+  dplyr::mutate(Slice_Height_Corrected_cm=(Slice_Height_cm*Compaction_Ratio),Slice_Area_cm2=pi*(2.54^2),Slice_Volume_cm3=Slice_Area_cm2*Slice_Height_Corrected_cm, Sediment_Depth_cm=(Slice_Number*2)*Compaction_Ratio)%>%
   mutate(Sample_Density_g_per_ml=Sample_Weight_gDW/Slice_Volume_cm3,
          Sediment_Density_g_per_ml=Sediment_Weight_gDW/Slice_Volume_cm3,
          Frac_Rhizome=Rhizome_gDW/Sample_Weight_gDW,
          Rhizome_Density_g_per_ml=Frac_Rhizome*Sample_Density_g_per_ml)%>%
     dplyr::mutate(Factor=ifelse(Site=="SJBA" | Site=="SJBB" | Site=="SJBC" | Site=="SMARA" | Site=="SMARB" | Site=="SMARC" | Site=="STCHA" |Site=="STCHB" |Site=="STCHC" ,"Control","Seagrass"))%>%
   mutate(Percent_Shell=Frac_Pebbles*100,Percent_Gravel=Frac_Gravel*100,Percent_Coarse=Frac_Coarse_Sand*100,Percent_Medium=Frac_Medium_Sand*100,Percent_Fine=Frac_Fine_Sand*100,Percent_Silt=Frac_Silt*100)%>%
-  dplyr::select(1:8,19:32)
+  dplyr::select(1:8,19:33)
 
 names(Grainsize_QAQC)
 
@@ -195,12 +197,12 @@ ggplot(LOI_QAQC,aes(x=(Sediment_Depth_cm)))+geom_histogram(binwidth = 1)+xlab("S
 
 #Sediments
 Grainsize_QAQC_long=Grainsize_QAQC%>%
-  dplyr::select(1:2,12:13,15:22)%>%
+  dplyr::select(1:2,13:14,16:23)%>%
   gather(key="Grainsize","Percent",7:12)
 
 
 #grainsizes
-ggplot(Grainsize_QAQC_long,aes(x=as.integer(Percent),fill=Factor))+geom_histogram(position = "dodge") + xlab("Percent Grainsize per Slice") + ylab("Frequency") + facet_wrap(~Grainsize)
+ggplot(Grainsize_QAQC_long,aes(x=as.integer(Percent),fill=Factor))+geom_density(position = "dodge",alpha=0.5) + xlab("Percent Grainsize per Slice") + ylab("Frequency") + facet_wrap(~Grainsize,scale="free_y")
 
 ```
 
@@ -211,14 +213,16 @@ ggplot(Grainsize_QAQC_long,aes(x=as.integer(Percent),fill=Factor))+geom_histogra
 names(LOI_QAQC)
 
 LOI_QAQC_By_Site_Slice=LOI_QAQC%>%
-  dplyr::group_by(Site,Factor,Quadrat,Bagged_Slice_Number,Slice_Number,Slice_Height_Corrected_cm,Sediment_Depth_cm,Sediment_Depth_Group)%>%
-  dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE),Organic_Content_Density_g_per_ml=mean(Organic_Content_Density_g_per_ml,na.rm=TRUE),Inorganic_Content_Density_g_per_ml=mean(Inorganic_Content_Density_g_per_ml,na.rm=TRUE),Percent_Carbon=mean(Percent_Carbon,na.rm=TRUE),Rhizome_Density_g_per_ml=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),Shell_Density_g_per_ml=mean(Shell_Density_g_per_ml,na.rm=TRUE),Sediment_Density_g_per_ml=mean(Sediment_Density_g_per_ml,na.rm=TRUE),Sample_Density_g_per_ml=mean(Sample_Density_g_per_ml,na.rm=TRUE))%>%
+  dplyr::filter(Sediment_Depth_cm<=40)%>%
+  dplyr::group_by(Site,Factor,Quadrat,Bagged_Slice_Number,Slice_Number,Slice_Height_Corrected_cm,Sediment_Depth_Group)%>%
+  dplyr::summarize(Sediment_Depth_cm=unique(round(Sediment_Depth_cm,2)),OLOI=mean(OLOI,na.rm=TRUE),ILOI=mean(ILOI,na.rm=TRUE),Organic_Content_Density_g_per_ml=mean(Organic_Content_Density_g_per_ml,na.rm=TRUE),Inorganic_Content_Density_g_per_ml=mean(Inorganic_Content_Density_g_per_ml,na.rm=TRUE),Percent_Carbon=mean(Percent_Carbon,na.rm=TRUE),Rhizome_Density_g_per_ml=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),Shell_Density_g_per_ml=mean(Shell_Density_g_per_ml,na.rm=TRUE),Sediment_Density_g_per_ml=mean(Sediment_Density_g_per_ml,na.rm=TRUE),Sample_Density_g_per_ml=mean(Sample_Density_g_per_ml,na.rm=TRUE))%>%
   ungroup()%>%
   filter(is.na(OLOI)==FALSE)%>%
   dplyr::mutate(Organic_Carbon_Density_g_per_ml=(Percent_Carbon/100) * Sediment_Density_g_per_ml,
          Inorganic_Carbon_Density_g_per_ml=(Inorganic_Content_Density_g_per_ml* 0.12),
-         Total_Carbon_Density_g_per_ml=Organic_Carbon_Density_g_per_ml+Inorganic_Carbon_Density_g_per_ml)
-
+         Total_Carbon_Density_g_per_ml=Organic_Carbon_Density_g_per_ml+Inorganic_Carbon_Density_g_per_ml)%>%
+    mutate(Sediment_Depth_Factor=ifelse(Sediment_Depth_cm<15,"shallow","deep"))%>%
+  mutate(Sediment_Depth_Factor=factor(Sediment_Depth_Factor,levels=c("shallow","deep")))
 
 
 LOI_QAQC_By_Site_Slice%>%
@@ -259,115 +263,99 @@ ggplot(LOI_QAQC_By_Site_Slice,aes(y=(Total_Carbon_Density_g_per_ml),fill=Factor)
 LOI_QAQC_By_Site_Slice%>%
   dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
   dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
-  dplyr::summarize(mean=mean(Rhizome_Density_g_per_ml,na.rm=TRUE),cover=mean())%>%
+  dplyr::summarize(mean=mean(Rhizome_Density_g_per_ml,na.rm=TRUE))%>%
   mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("Rhizome Density (g/cm3) of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Rhizome Content by Sediment Depth ")+coord_flip()
+    ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="lm",) + ylab("Rhizome Density (g/cm3) of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Rhizome Content by Sediment Depth ")+coord_flip()#+xlim(-13,0)
 
 #testing for relationship with slice depth 
-rhiz_depth_lm=lm(Rhizome_Density_g_per_ml ~ Factor*Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
+rhiz_depth_lm=lm(Rhizome_Density_g_per_ml ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
 summary(rhiz_depth_lm)
 
 
 # Shell  (g/ml) 
 LOI_QAQC_By_Site_Slice%>%
   dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm,Sediment_Depth_Factor)%>%
   dplyr::summarize(mean=mean(Shell_Density_g_per_ml,na.rm=TRUE))%>%
-  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("Shell Density (g/cm3) of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Shell Content by Sediment Depth ")+coord_flip()
+  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="lm") + ylab("Shell Density (g/cm3) of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Shell Content by Sediment Depth ")+coord_flip()+facet_wrap(~Sediment_Depth_Factor,scales = "free_y")
 
 #testing for relationship with slice depth 
-rhiz_depth_lm=lm(Rhizome_Density_g_per_ml ~ Factor*Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
-summary(rhiz_depth_lm)
-# Percent OLOI
-LOI_QAQC_By_Site_Slice%>%
-  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
-  dplyr::summarize(mean=mean(OLOI,na.rm=TRUE))%>%
-  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OM % of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Organic Content by Sediment Depth ")+coord_flip()
+shell_depth_lm=lm(Shell_Density_g_per_ml ~  Factor + Sediment_Depth_Factor, data=LOI_QAQC_By_Site_Slice)
+summary(shell_depth_lm)
 
-OLOI_depth_lm=lm(OLOI ~ Factor*Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
-summary(OLOI_depth_lm)
+# # Percent OLOI
+# LOI_QAQC_By_Site_Slice%>%
+#   dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+#   dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm,Sediment_Depth_Factor)%>%
+#   dplyr::summarize(mean=mean(OLOI,na.rm=TRUE))%>%
+#   dplyr::mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="lm",) + ylab("OM % of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Organic Content by Sediment Depth ")+coord_flip()+facet_wrap(~Sediment_Depth_Factor,scale="free_y")
+# 
+# OLOI_shallow_lm=lm(OLOI ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="shallow",])
+# summary(OLOI_shallow_lm)
+# 
+# OLOI_deep_lm=lm(OLOI ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="deep",])
+# summary(OLOI_deep_lm)
 
-# Percent Inorganic Content
-LOI_QAQC_By_Site_Slice%>%
-  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  # filter(Site!="STCHC")%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
-  dplyr::summarize(mean=mean(ILOI,na.rm=TRUE))%>%
-  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("% Carbonte of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Carbonate Content by Sediment Depth ")+coord_flip() 
-
-ILOI_depth_lm=lm(ILOI ~ Factor*Sediment_Depth_cm + Factor, 
-                 data=LOI_QAQC_By_Site_Slice)
+# # Percent Inorganic Content
+# LOI_QAQC_By_Site_Slice%>%
+#   dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
+#   # filter(Site!="STCHC")%>%
+#   dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm,Sediment_Depth_Factor)%>%
+#   dplyr::summarize(mean=mean(ILOI,na.rm=TRUE))%>%
+#   mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
+#               ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="lm",) + ylab("% Carbonte of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Carbonate Content by Sediment Depth ")+coord_flip() +facet_wrap(~Sediment_Depth_Factor, scale="free_y")
+# 
+# ILOI_shallow_lm=lm(ILOI ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="shallow",])
+# summary(ILOI_shallow_lm)
+# 
+# ILOI_deep_lm=lm(ILOI ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="deep",])
+# summary(ILOI_deep_lm)
                   # data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Site!="STCHC",])
 summary(ILOI_depth_lm)
-
-
-# Percent Organic Carbon
-LOI_QAQC_By_Site_Slice%>%
-  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
-  dplyr::summarize(mean=mean(Percent_Carbon,na.rm=TRUE))%>%
-  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OC % of Slice") + xlab("Sediment Depth (cm)") + ggtitle("Percent Organic Carbon by Sediment Depth ")+coord_flip()
-
-Percent_Carbon_depth_lm=lm(Percent_Carbon ~ Factor*Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
-summary(Percent_Carbon_depth_lm)
-
 
 # Organic Carbon Density
 LOI_QAQC_By_Site_Slice%>%
   dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm,Sediment_Depth_Factor)%>%
   dplyr::summarize(mean=mean(Organic_Carbon_Density_g_per_ml,na.rm=TRUE))%>%
   mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("OC Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Organic Carbon Density by Sediment Depth ")+coord_flip()
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="lm",) + ylab("OC Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Organic Carbon Density by Sediment Depth ")+coord_flip()+facet_wrap(~Sediment_Depth_Factor, scale="free_y")
 
-OCD_depth_lm=lm(Organic_Carbon_Density_g_per_ml ~ Factor*Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
-summary(OCD_depth_lm)
+
+OCD_deep_lm=lm(Organic_Carbon_Density_g_per_ml ~ Factor + Sediment_Depth_cm + Sediment_Depth_Factor, data=LOI_QAQC_By_Site_Slice)
+summary(OCD_deep_lm)
+
+OCD_shallow_lm=lm(Organic_Carbon_Density_g_per_ml ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="shallow",])
+summary(OCD_shallow_lm)
+
+OCD_deep_lm=lm(Organic_Carbon_Density_g_per_ml ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="deep",])
+summary(OCD_deep_lm)
 
 
 # Inorganic Carbon Density
 LOI_QAQC_By_Site_Slice%>%
   dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
+  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm,Sediment_Depth_Factor)%>%
   dplyr::summarize(mean=mean(Inorganic_Carbon_Density_g_per_ml,na.rm=TRUE))%>%
   mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("IOC Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Inorganic Carbon Density by Sediment Depth ")+coord_flip()
-
-ICD_depth_lm=lm(Inorganic_Carbon_Density_g_per_ml ~ Factor*Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice)
-summary(OCD_depth_lm)
+              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="lm",) + ylab("IOC Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Inorganic Carbon Density by Sediment Depth ")+coord_flip()+facet_wrap(~Sediment_Depth_Factor, scale="free_y")
 
 
-#  Total Carbon Density
-LOI_QAQC_By_Site_Slice%>%
-  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
-  dplyr::summarize(mean=mean(Total_Carbon_Density_g_per_ml,na.rm=TRUE))%>%
-  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("Total C Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Total Carbon Density by Sediment Depth ")+coord_flip()
+ICD_shallow_lm=lm(Inorganic_Carbon_Density_g_per_ml ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="shallow",])
+summary(ICD_shallow_lm)
+
+ICD_deep_lm=lm(Inorganic_Carbon_Density_g_per_ml ~ Sediment_Depth_cm + Factor, data=LOI_QAQC_By_Site_Slice[LOI_QAQC_By_Site_Slice$Sediment_Depth_Factor=="deep",])
+summary(ICD_deep_lm)
 
 
-#  Shell Density
-LOI_QAQC_By_Site_Slice%>%
-  dplyr::mutate(Sediment_Depth_cm=as.factor(as.integer(Sediment_Depth_cm)))%>%
-  dplyr::group_by(Factor,Site,Quadrat,Sediment_Depth_cm)%>%
-  dplyr::summarize(mean=mean(Shell_Density_g_per_ml,na.rm=TRUE))%>%
-  mutate(Sediment_Depth_cm=as.integer(Sediment_Depth_cm))%>%
-              ggplot(aes(y=(mean),x=-Sediment_Depth_cm,color=Factor,fill=Factor))+geom_point() + geom_smooth(method="gam",) + ylab("Shell Density (g/cm3)") + xlab("Sediment Depth (cm)") + ggtitle("Shell Density by Sediment Depth ")+coord_flip()
-
-
-
-LOI_QAQC_By_Site=LOI_QAQC_By_Site_Slice%>%
+LOI_QAQC_Quadrat_Level=LOI_QAQC_By_Site_Slice%>%
   mutate(Organic_accum_per_cm=Organic_Content_Density_g_per_ml*Slice_Height_Corrected_cm,
   Inorganic_accum_per_cm=Inorganic_Content_Density_g_per_ml*Slice_Height_Corrected_cm,
   Shell_accum_per_cm=Shell_Density_g_per_ml*Slice_Height_Corrected_cm,
   Rhizome_accum_per_cm=Rhizome_Density_g_per_ml*Slice_Height_Corrected_cm,
   Organic_Carbon_accum_per_cm=Organic_Carbon_Density_g_per_ml*Slice_Height_Corrected_cm,
   Inorganic_Carbon_accum_per_cm=Inorganic_Carbon_Density_g_per_ml*Slice_Height_Corrected_cm)%>%
-  dplyr::group_by(Site,Factor,Quadrat)%>% #AVERAGING WITHIN A QUADRAT
+  dplyr::group_by(Site,Factor,Sediment_Depth_Factor,Quadrat)%>% #AVERAGING WITHIN A QUADRAT
   dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),
                    ILOI=mean(ILOI,na.rm=TRUE),
                    Carbon=mean(Percent_Carbon,na.rm=TRUE),
@@ -377,15 +365,19 @@ LOI_QAQC_By_Site=LOI_QAQC_By_Site_Slice%>%
                    Rhizome_accum_per_cm=mean(Rhizome_accum_per_cm,na.rm=TRUE),
                    Organic_Carbon_accum_per_cm=mean(Organic_Carbon_accum_per_cm,na.rm=TRUE),
                    Inorganic_Carbon_accum_per_cm=mean(Inorganic_Carbon_accum_per_cm,na.rm=TRUE))%>% # Converting the estiamtes to Value within a squre meter area up to 50cm sediment depth. (and 10 cm depth for rhizomes)
-  dplyr::mutate(OM_g_per_sqm=Organic_accum_per_cm*(1/0.0001)*50,
-         IOM_g_per_sqm=Inorganic_accum_per_cm*(1/0.0001)*50,
-         Shell_g_per_sqm=Shell_accum_per_cm*(1/0.0001)*50,
-         Rhizome_g_per_sqm=Rhizome_accum_per_cm*(1/0.0001)*10,
-         OC_Stock_g_per_sqm=Organic_Carbon_accum_per_cm*(1/0.0001)*50,
-         IOC_Stock_g_per_sqm=Inorganic_Carbon_accum_per_cm*(1/0.0001)*50,
+  dplyr::mutate(Stock_Scaling_Factor=ifelse(Sediment_Depth_Factor=="shallow",15,25),
+                OM_g_per_sqm=Organic_accum_per_cm*(1/0.0001)*Stock_Scaling_Factor,
+         IOM_g_per_sqm=Inorganic_accum_per_cm*(1/0.0001)*Stock_Scaling_Factor,
+         Shell_g_per_sqm=Shell_accum_per_cm*(1/0.0001)*Stock_Scaling_Factor,
+         Rhizome_g_per_sqm=Rhizome_accum_per_cm*(1/0.0001)*14,
+         OC_Stock_g_per_sqm=Organic_Carbon_accum_per_cm*(1/0.0001)*Stock_Scaling_Factor,
+         IOC_Stock_g_per_sqm=Inorganic_Carbon_accum_per_cm*(1/0.0001)*Stock_Scaling_Factor,
          Total_C_Stock_g_per_sqm=IOC_Stock_g_per_sqm+OC_Stock_g_per_sqm)%>%
-  dplyr::ungroup()%>%
-  dplyr::group_by(Site,Factor)%>%
+  dplyr::ungroup()
+
+
+LOI_QAQC_Site_Level=LOI_QAQC_Quadrat_Level%>%
+  dplyr::group_by(Site,Factor,Sediment_Depth_Factor)%>%
   dplyr::summarize(OLOI=mean(OLOI,na.rm=TRUE),
                    ILOI=mean(ILOI,na.rm=TRUE),
                    Carbon=mean(Carbon,na.rm=TRUE),
@@ -396,6 +388,8 @@ LOI_QAQC_By_Site=LOI_QAQC_By_Site_Slice%>%
                    Total_Carbon_Stock_g_per_sqm=mean(Total_C_Stock_g_per_sqm,na.rm=TRUE))%>%
       ungroup()
 
+
+#this is as far as I got on March 25 2021.
 
 seagrass_surveys_By_Site=seagrass_surveys%>%
   mutate(Total_Seagrass_Cover=(Seagrass_Spp/100)*(SAV_Cover/100)*100,
@@ -680,21 +674,26 @@ names(Temperature.Mean)<-c("Temperature.Mean")
 
 Primary.productivity.Max=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/data_output/Present.Benthic.Mean.Depth.Primary.productivity.Max.tif")
 names(Primary.productivity.Max)<-c("Primary.productivity.Max")
+
+Current.Velocity.Max=raster("C:/Users/jennm/Dropbox/GITHUB/Disseratation/Large_Project_DataSets/BioOracle/data_output/Present.Benthic.Mean.Depth.Current.Velocity.Max.tif")
+names(Current.Velocity.Max)<-c("Current.Velocity.Max")
 # 
 coordinates(BlueCarbon_QAQC)<- ~Longitude + Latitude
 proj4string(BlueCarbon_QAQC) <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
 ## 
 Mapped_points=over(BlueCarbon_QAQC, FWCC_Seagrass_Maps[4]) 
-Temperature.Mean.pts=extract(x=Temperature.Mean,y=BlueCarbon_QAQC)
-PPM.pts=extract(x=Primary.productivity.Max,y=BlueCarbon_QAQC)
+Temperature.Mean.pts=raster::extract(x=Temperature.Mean,y=BlueCarbon_QAQC)
+PPM.pts=raster::extract(x=Primary.productivity.Max,y=BlueCarbon_QAQC)
+CV.pts=raster::extract(x=Current.Velocity.Max,y=BlueCarbon_QAQC)
 
 # 
 FWCC_Seagrass_Extent=as.vector(Mapped_points)
 Temperature.Mean.pts=as.data.frame(Temperature.Mean.pts)
 PPM.pts=as.data.frame(PPM.pts)
+CV.pts=as.data.frame(CV.pts)
 
-BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent,Temperature.Mean.pts,PPM.pts))
-names(BlueCarbon_QAQC)[45:47]<-c("FWCC_Seagrass_Extent","Temperature.Mean","Primary.productivity.Max")
+BlueCarbon_QAQC=as.data.frame(cbind(BlueCarbon_QAQC,FWCC_Seagrass_Extent,Temperature.Mean.pts,PPM.pts,CV.pts))
+names(BlueCarbon_QAQC)[45:48]<-c("FWCC_Seagrass_Extent","Temperature.Mean","Primary.productivity.Max","Current.Velocity.Max")
 # 
 summary(BlueCarbon_QAQC)
 # names(BlueCarbon_QAQC)
