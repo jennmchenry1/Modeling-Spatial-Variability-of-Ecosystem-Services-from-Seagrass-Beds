@@ -50,6 +50,8 @@ BlueCarbon_QAQC=BlueCarbon_QAQC%>%
 BlueCarbon_QAQC<-BlueCarbon_QAQC%>%
   mutate_at(vars(Seagrass_Biomass_g_per_sqm , Macro_Algae_Biomass_g_per_sqm, Thalassia_testudinum_g_per_sqm ,Syringodium_filiforme_g_per_sqm,Halodule_wrightii_g_per_sqm), ~replace_na(., 0))
 
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(Epiphyte_Load=(Epiphite_Blade_Load/100)*(Epiphite_Shoot_Load/100)*100)
 
 BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
 
@@ -80,7 +82,7 @@ names(BlueCarbon_QAQC)
 # Secchi_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Secchi_model_BIOMASS)
 
-Epiphytes_Structure=gam((Seagrass_Biomass_g_per_sqm)~ s(Epiphite_Blade_Load,bs="ts",k=4)+s(Epiphite_Shoot_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+Epiphytes_Structure=gam((Seagrass_Biomass_g_per_sqm)~ s(Epiphyte_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 summary(Epiphytes_Structure)
 
 Meadow_Structure=gam((Seagrass_Biomass_g_per_sqm)~ Meadow.Structure, data=BlueCarbon_QAQC,method="ML")
@@ -167,7 +169,7 @@ stepwise_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~
     # s(Dist_To_River,bs="ts",k=4)   +
     s(Total_Seagrass_Cover,bs="ts",k=4) + 
       s(Total_Algae_Cover,bs="ts",k=4)   + 
-      # s(Epiphite_Shoot_Load,bs="ts",k=4)+
+      # s(Epiphyte_Load,bs="ts",k=4)+
                       # as.factor(Factor) +
       # Meadow.Structure+
       # SY_PA+
@@ -215,7 +217,8 @@ summary(SPP_PA_model_Rhiz)
 # summary(Seagrass_Spp_Cover_model_Rhiz)
 
 
-Epiphytes_Structure_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Epiphite_Blade_Load,bs="ts",k=4)+s(Epiphite_Shoot_Load,bs="ts",k=4) +s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+Epiphytes_Structure_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Epiphyte_Load,bs="ts",k=4)
+, data=BlueCarbon_QAQC,method="ML")
 summary(Epiphytes_Structure_Rhiz)
 draw(Epiphytes_Structure_Rhiz)
 
@@ -275,8 +278,7 @@ full_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~
                      #       (SY_PA) +
                       # Meadow.Structure+
                      s(Total_Seagrass_Cover,bs="ts",k=4)+   
-                      s(Epiphite_Blade_Load,bs="ts",k=4)+ 
-                      s(Epiphite_Shoot_Load,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
                      s(Dist_To_River,bs="ts",k=4) +
                      s(Light.bottom.Min,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4)+
@@ -292,8 +294,7 @@ summary(full_model_Rhiz)
 
 stepwise_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ 
      s(Total_Seagrass_Cover,bs="ts",k=4)+   
-                      # s(Epiphite_Blade_Load,bs="ts",k=4)+ 
-                      # s(Epiphite_Shoot_Load,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
                      # s(Dist_To_River,bs="ts",k=4) +
                      # s(Light.bottom.Min,bs="ts",k=4)+
                      # s(Nitrate.Mean,bs="ts",k=4)+
@@ -355,7 +356,7 @@ summary(Seagrass_Biomass_model_OCD)
 Meadow_Structure_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ Meadow.Structure, data=BlueCarbon_QAQC,method="ML")
 summary(Meadow_Structure_OCD)
 
-# Epiphytes_Structure_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Epiphite_Blade_Load,bs="ts",k=4)+s(Epiphite_Shoot_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# Epiphytes_Structure_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~                     s(Epiphyte_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 # summary(Epiphytes_Structure_OCD)
 
 # Sand_model_OCD=gam(Organic_Carbon_Stock_g_per_sqm ~ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
@@ -419,6 +420,7 @@ summary(full_model_OCD)
 
 stepwise_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ 
                            s(Par.Mean,bs="ts",k=4)+
+                      # s(Epiphyte_Load,bs="ts",k=4)+
                      # s(Dist_To_Shore,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4) +
                        # s(Salinity.Min,bs="ts",k=4)+
@@ -471,8 +473,8 @@ BlueCarbon_QAQC%>%
 # 
 # summary(Seagrass_Spp_Cover_model_In)
 
-Epiphytes_Structure_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Epiphite_Blade_Load,bs="ts",k=4)+s(Epiphite_Shoot_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
-summary(Epiphytes_Structure_In)
+# Epiphytes_Structure_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~                     s(Epiphyte_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Epiphytes_Structure_In)
 
 Shells_Biomass_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~  s(Shell_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
 
@@ -526,7 +528,7 @@ summary(Rhizomes_model_In)
 cor(BlueCarbon_QAQC[c(cont.preds,"Inorganic_Carbon_Stock_g_per_sqm")],)
 
 full_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                    s(Epiphite_Shoot_Load,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
                     s(Shell_Stock_g_per_sqm,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4)+
                       s(Primary.productivity.Max,bs="ts",k=4)+
@@ -545,7 +547,7 @@ summary(full_model_In)
 
 
 stepwise_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
-                        # s(Epiphite_Shoot_Load,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
                     # s(Shell_Stock_g_per_sqm,bs="ts",k=4)+
                      s(Nitrate.Mean,bs="ts",k=4)+
                       # s(Primary.productivity.Max,bs="ts",k=4)+
