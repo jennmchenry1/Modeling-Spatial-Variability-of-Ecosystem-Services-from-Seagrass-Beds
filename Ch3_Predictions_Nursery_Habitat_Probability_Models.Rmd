@@ -181,8 +181,8 @@ Mud=as.factor(Mud)
 
 
 rs_stack_study_region_inshore_grid$BottomVegCover<-BottomVegCover
-# rs_stack_study_region_inshore_grid$TH_PA<-TH_PA
-# rs_stack_study_region_inshore_grid$SY_PA<-SY_PA
+rs_stack_study_region_inshore_grid$TH_PA<-TH_PA
+rs_stack_study_region_inshore_grid$SY_PA<-SY_PA
 rs_stack_study_region_inshore_grid$HA_PA<-HA_PA
 # rs_stack_study_region_inshore_grid$HA_PA<-Mud #FIX THIS
 rs_stack_study_region_inshore_grid$Mud<-Mud
