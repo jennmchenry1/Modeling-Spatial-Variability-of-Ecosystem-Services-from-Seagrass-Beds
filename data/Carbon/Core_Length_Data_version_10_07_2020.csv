@@ -1,156 +1,102 @@
 Date,Region,Site,Diver Name,Quadrat,Insertion Depth (cm),Core Length (cm),Compaction_Ratio,Core Number (if different from quadrat number),Core_Number_Corrected,Notes
-8/8/2019,Steinhatchee,STCH20,Jenn McHenry,11,33.5,30.5,0.910447761,1,1,
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,10,41,28,0.682926829,,10,Core length on outside of bag
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,10,41,28,0.682926829,,10,Core length on outside of bag
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,9,50,46,0.92,,9,Core length on outside of bag
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,9,50,46,0.92,,9,Core length on outside of bag
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,8,50,36,0.72,,8,Core length on outside of bag
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,8,50,36,0.72,,8,Core length on outside of bag
-6/14/2019,Saint Marks,SMAR01,Jenn McHenry,8,50,36,0.72,,8,Core length on outside of bag
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,8,50,43.8,0.876,1,1,
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,8,50,43.8,0.876,1,1,
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,7,50,45.5,0.91,2,2,
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,7,50,45.5,0.91,2,2,
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,7,50,45.5,0.91,2,2,
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,6,40,22.2,0.555,3,3,
-6/25/2019,Steinhatchee,STCH06,Jenn McHenry,6,40,22.2,0.555,3,3,
-8/14/2019,Saint Marks,SMAR12,Jenn McHenry,4,50,43.9,0.878,,3,
-8/8/2019,Steinhatchee,STCH20,Jenn McHenry,4,29,25,0.862068966,2,2,
-7/25/2019,Saint Joe Bay,SJB02,Jenn McHenry,3,60,36.2,0.603333333,,3,Was supposed to be halodule
-7/9/2019,Saint Joe Bay,SJB06,Jenn McHenry,3,36,32.5,0.902777778,,3,
-7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,3,42,26.5,0.630952381,,3,Need to grab the core length from the bags.
-7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,3,42,26.5,0.630952381,,3,Need to grab the core length from the bags.
-7/10/2019,Saint Joe Bay,SJB10,Jenn McHenry,3,50,36.9,0.738,,3,
-7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,3,45,35.7,0.793333333,,3,
-7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,3,45,35.7,0.793333333,,3,
-7/8/2019,Saint Joe Bay,SJB14,Jenn McHenry,3,48,32.5,0.677083333,,3,These measurements don’t make sense for some reason.
-8/30/2019,Saint Joe Bay,SJB16,Jenn McHenry,3,40.3,29,0.719602978,,3,
-7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,3,50,34.8,0.696,,3,
-7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,3,50,34.8,0.696,,3,
-7/25/2019,Saint Joe Bay,SJB24,Jenn McHenry,3,33.5,31.5,0.940298507,,3,
-7/11/2019,Saint Joe Bay,SJBA,Jenn McHenry,3,36,30.6,0.85,,3,
-7/11/2019,Saint Joe Bay,SJBB,Jenn McHenry,3,37,34,0.918918919,,3,
-8/30/2019,Saint Joe Bay,SJBC,Jenn McHenry,3,40.1,37.5,0.935162095,,3,
-8/13/2019,Saint Marks,SMAR03,Jenn McHenry,3,50,41.1,0.822,,3,
-8/13/2019,Saint Marks,SMAR03,Jenn McHenry,3,50,41.1,0.822,,3,
-8/13/2019,Saint Marks,SMAR04,Jenn McHenry,3,50,42.7,0.854,,3,
-8/14/2019,Saint Marks,SMAR14,Jenn McHenry,3,50,26.5,0.53,,3,
-8/14/2019,Saint Marks,SMAR14,Jenn McHenry,3,50,26.5,0.53,,3,
-8/20/2019,Saint Marks,SMAR23,Jenn McHenry,3,33,32.6,0.987878788,,3,
-8/20/2019,Saint Marks,SMAR23,Jenn McHenry,3,33,32.6,0.987878788,,3,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,3,50,43.7,0.874,,3,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,3,50,43.7,0.874,,3,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,3,50,43.7,0.874,,3,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,3,50,32.8,0.656,,3,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,3,50,32.8,0.656,,3,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,3,50,32.8,0.656,,3,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,3,50,32.8,0.656,,3,
-8/16/2019,Saint Marks,SMARA,Jenn McHenry,3,50,29,0.58,,3,
-8/16/2019,Saint Marks,SMARB,Jenn McHenry,3,50,41.2,0.824,,3,
-8/20/2019,Saint Marks,SMARC,Jenn McHenry,3,33.6,30.5,0.907738095,,3,
-6/24/2019,Steinhatchee,STCH01,Jenn McHenry,3,50,32,0.64,,3,
-6/24/2019,Steinhatchee,STCH02,Jenn McHenry,3,50,28.5,0.57,,3,
-6/24/2019,Steinhatchee,STCH04,Jenn McHenry,3,50,44,0.88,,3,
-6/25/2019,Steinhatchee,STCH05,Jenn McHenry,3,50,47,0.94,,3,Check to make sure the percent cover values shouldn’t be swapped.
-6/25/2019,Steinhatchee,STCH05,Jenn McHenry,3,50,47,0.94,,3,Check to make sure the percent cover values shouldn’t be swapped.
-6/25/2019,Steinhatchee,STCH05,Jenn McHenry,3,50,47,0.94,,3,
-7/30/2019,Steinhatchee,STCH12,Jenn McHenry,3,32.7,27.4,0.837920489,,3,Bagged as STCH13
-7/30/2019,Steinhatchee,STCH12,Jenn McHenry,3,32.7,27.4,0.837920489,,3,Bagged as STCH13
-8/8/2019,Steinhatchee,STCH20,Jenn McHenry,3,30.5,27.5,0.901639344,,3,Bagged as STCH12
-8/8/2019,Steinhatchee,STCH21,Jenn McHenry,3,42,28.7,0.683333333,,3,
-7/30/2019,Steinhatchee,STCHA,Jenn McHenry,3,16.5,10.5,0.636363636,,3,
-7/30/2019,Steinhatchee,STCHB,Jenn McHenry,3,50,44,0.88,,3,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
-8/8/2019,Steinhatchee,STCHC,Jenn McHenry,3,30,22.5,0.75,,3,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
-7/25/2019,Saint Joe Bay,SJB02,Jenn McHenry,2,50,42,0.84,,2,Was supposed to be halodule
-7/9/2019,Saint Joe Bay,SJB06,Jenn McHenry,2,42,36.1,0.85952381,,2,
-7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,2,38,31.5,0.828947368,,2,
-7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,2,38,31.5,0.828947368,,2,
-7/10/2019,Saint Joe Bay,SJB10,Jenn McHenry,2,36,33.2,0.922222222,,2,
-7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,2,41,38.6,0.941463415,,2,
-7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,2,41,38.6,0.941463415,,2,
-7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,2,41,38.6,0.941463415,,2,
-7/8/2019,Saint Joe Bay,SJB14,Jenn McHenry,2,50,39,0.78,,2,These measurements don’t make sense for some reason.
-8/30/2019,Saint Joe Bay,SJB16,Jenn McHenry,2,40.3,33.9,0.841191067,,2,
-7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,2,50,33.8,0.676,,2,
-7/25/2019,Saint Joe Bay,SJB24,Jenn McHenry,2,37.5,31,0.826666667,,2,
-7/11/2019,Saint Joe Bay,SJBA,Jenn McHenry,2,38,27.6,0.726315789,,2,
-7/11/2019,Saint Joe Bay,SJBB,Jenn McHenry,2,40,32.2,0.805,,2,
-8/30/2019,Saint Joe Bay,SJBC,Jenn McHenry,2,30,24.5,0.816666667,,2,
-8/13/2019,Saint Marks,SMAR03,Jenn McHenry,2,50,41.1,0.822,,2,
-8/13/2019,Saint Marks,SMAR03,Jenn McHenry,2,50,41.1,0.822,,2,
-8/13/2019,Saint Marks,SMAR03,Jenn McHenry,2,50,41.1,0.822,,2,
-8/13/2019,Saint Marks,SMAR04,Jenn McHenry,2,27,20.6,0.762962963,,2,
-8/13/2019,Saint Marks,SMAR04,Jenn McHenry,2,27,20.6,0.762962963,,2,
-8/14/2019,Saint Marks,SMAR12,Jenn McHenry,2,50,23.6,0.472,,2,
-8/14/2019,Saint Marks,SMAR12,Jenn McHenry,2,50,23.6,0.472,,2,
-8/14/2019,Saint Marks,SMAR14,Jenn McHenry,2,50,45.5,0.91,,2,
-8/14/2019,Saint Marks,SMAR14,Jenn McHenry,2,50,45.5,0.91,,2,
-8/20/2019,Saint Marks,SMAR23,Jenn McHenry,2,50,42.5,0.85,,2,
-8/20/2019,Saint Marks,SMAR23,Jenn McHenry,2,50,42.5,0.85,,2,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,2,32,31.9,0.996875,,2,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,2,32,31.9,0.996875,,2,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,2,32,31.9,0.996875,,2,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,2,50,37.5,0.75,,2,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,2,50,37.5,0.75,,2,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,2,50,37.5,0.75,,2,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,2,50,37.5,0.75,,2,
-8/16/2019,Saint Marks,SMARA,Jenn McHenry,2,50,29.2,0.584,,2,
-8/16/2019,Saint Marks,SMARB,Jenn McHenry,2,50,43.5,0.87,,2,
-8/20/2019,Saint Marks,SMARC,Jenn McHenry,2,31,30.2,0.974193548,,2,
-6/24/2019,Steinhatchee,STCH01,Jenn McHenry,2,28,22.5,0.803571429,,2,
-6/24/2019,Steinhatchee,STCH02,Jenn McHenry,2,50,20,0.4,,2,
-6/24/2019,Steinhatchee,STCH04,Jenn McHenry,2,50,43,0.86,,2,
-6/25/2019,Steinhatchee,STCH05,Jenn McHenry,2,50,25,0.5,,2,
-6/25/2019,Steinhatchee,STCH05,Jenn McHenry,2,50,25,0.5,,2,
-7/30/2019,Steinhatchee,STCH12,Jenn McHenry,2,22.3,19.8,0.887892377,,2,Bagged as STCH13
-7/30/2019,Steinhatchee,STCH12,Jenn McHenry,2,22.3,19.8,0.887892377,,2,Bagged as STCH13
-7/30/2019,Steinhatchee,STCH12,Jenn McHenry,2,22.3,19.8,0.887892377,,2,Bagged as STCH13
-8/8/2019,Steinhatchee,STCH21,Jenn McHenry,2,42.5,30,0.705882353,,2,
-8/8/2019,Steinhatchee,STCH21,Jenn McHenry,2,42.5,30,0.705882353,,2,
-7/30/2019,Steinhatchee,STCHA,Jenn McHenry,2,13,13,1,,2,
-7/30/2019,Steinhatchee,STCHA,Jenn McHenry,2,13,13,1,,2,
-7/30/2019,Steinhatchee,STCHB,Jenn McHenry,2,35,14,0.4,,2,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
-8/8/2019,Steinhatchee,STCHC,Jenn McHenry,2,31,22.9,0.738709677,,2,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
 7/25/2019,Saint Joe Bay,SJB02,Jenn McHenry,1,50,42.5,0.85,,1,Was supposed to be halodule
-7/9/2019,Saint Joe Bay,SJB06,Jenn McHenry,1,42,36,0.857142857,,1,
-7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,1,37,30.6,0.827027027,,1,
-7/10/2019,Saint Joe Bay,SJB10,Jenn McHenry,1,50,38.7,0.774,,1,
-7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,1,40,40.4,1,,1,
+7/25/2019,Saint Joe Bay,SJB02,Jenn McHenry,2,50,42,0.84,,2,Was supposed to be halodule
+7/25/2019,Saint Joe Bay,SJB02,Jenn McHenry,3,50,36.2,0.72,,3,"Changed from 60cm to 50cm, but I think this is a typo)"
+7/9/2019,Saint Joe Bay,SJB06,Jenn McHenry,1,42,36,0.86,,1,
+7/9/2019,Saint Joe Bay,SJB06,Jenn McHenry,2,42,36.1,0.86,,2,
+7/9/2019,Saint Joe Bay,SJB06,Jenn McHenry,3,36,32.5,0.90,,3,
+7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,1,37,30.6,0.83,,1,
+7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,2,38,31.5,0.83,,2,
+7/9/2019,Saint Joe Bay,SJB07,Jenn McHenry,3,42,26.5,0.63,,3,Need to grab the core length from the bags.
+7/10/2019,Saint Joe Bay,SJB10,Jenn McHenry,1,50,38.7,0.77,,1,
+7/10/2019,Saint Joe Bay,SJB10,Jenn McHenry,2,36,33.2,0.92,,2,
+7/10/2019,Saint Joe Bay,SJB10,Jenn McHenry,3,50,36.9,0.74,,3,
+7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,1,40,40.4,1.00,,1,
+7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,2,41,38.6,0.94,,2,
+7/8/2019,Saint Joe Bay,SJB13,Jenn McHenry,3,45,35.7,0.79,,3,
 7/8/2019,Saint Joe Bay,SJB14,Jenn McHenry,1,50,37,0.74,,1,These measurements don’t make sense for some reason.Possibly human error because we lost the data sheet at this site. Use an average insertion depth as a proxy.
-8/30/2019,Saint Joe Bay,SJB16,Jenn McHenry,1,40,33.9,0.8475,,1,
-7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,1,50,36.1,0.722,,1,Count bags for length of core
-7/25/2019,Saint Joe Bay,SJB24,Jenn McHenry,1,29.5,27,0.915254237,,1,
-7/11/2019,Saint Joe Bay,SJBA,Jenn McHenry,1,39,36.2,0.928205128,,1,Bag says that the core is 40cm
-7/11/2019,Saint Joe Bay,SJBB,Jenn McHenry,1,36,30.5,0.847222222,,1,
-8/30/2019,Saint Joe Bay,SJBC,Jenn McHenry,1,40,29.9,0.7475,,1,
+7/8/2019,Saint Joe Bay,SJB14,Jenn McHenry,2,50,39,0.78,,2,These measurements don’t make sense for some reason.
+7/8/2019,Saint Joe Bay,SJB14,Jenn McHenry,3,48,32.5,0.68,,3,These measurements don’t make sense for some reason.
+8/30/2019,Saint Joe Bay,SJB16,Jenn McHenry,1,40,33.9,0.85,,1,
+8/30/2019,Saint Joe Bay,SJB16,Jenn McHenry,2,40.3,33.9,0.84,,2,
+8/30/2019,Saint Joe Bay,SJB16,Jenn McHenry,3,40.3,29,0.72,,3,
+7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,1,50,36.1,0.72,,1,Count bags for length of core
+7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,2,50,33.8,0.68,,2,
+7/10/2019,Saint Joe Bay,SJB17,Jenn McHenry,3,50,34.8,0.70,,3,
+7/25/2019,Saint Joe Bay,SJB24,Jenn McHenry,1,29.5,27,0.92,,1,
+7/25/2019,Saint Joe Bay,SJB24,Jenn McHenry,2,37.5,31,0.83,,2,
+7/25/2019,Saint Joe Bay,SJB24,Jenn McHenry,3,33.5,31.5,0.94,,3,
+7/11/2019,Saint Joe Bay,SJBA,Jenn McHenry,1,39,36.2,0.93,,1,Bag says that the core is 40cm
+7/11/2019,Saint Joe Bay,SJBA,Jenn McHenry,2,38,27.6,0.73,,2,
+7/11/2019,Saint Joe Bay,SJBA,Jenn McHenry,3,36,30.6,0.85,,3,
+7/11/2019,Saint Joe Bay,SJBB,Jenn McHenry,1,36,30.5,0.85,,1,
+7/11/2019,Saint Joe Bay,SJBB,Jenn McHenry,2,40,32.2,0.81,,2,
+7/11/2019,Saint Joe Bay,SJBB,Jenn McHenry,3,37,34,0.92,,3,
+8/30/2019,Saint Joe Bay,SJBC,Jenn McHenry,1,40,29.9,0.75,,1,
+8/30/2019,Saint Joe Bay,SJBC,Jenn McHenry,2,30,24.5,0.82,,2,
+8/30/2019,Saint Joe Bay,SJBC,Jenn McHenry,3,40.1,37.5,0.94,,3,
+6/14/2019,Saint Marks,SMAR01,Jenn McHenry,8,50,36,0.72,,8,Core length on outside of bag
+6/14/2019,Saint Marks,SMAR01,Jenn McHenry,9,50,46,0.92,,9,Core length on outside of bag
+6/14/2019,Saint Marks,SMAR01,Jenn McHenry,10,41,28,0.68,,10,Core length on outside of bag
 8/13/2019,Saint Marks,SMAR03,Jenn McHenry,1,50,47,0.94,,1,
-8/13/2019,Saint Marks,SMAR03,Jenn McHenry,1,50,47,0.94,,1,
-8/13/2019,Saint Marks,SMAR04,Jenn McHenry,1,50,32.8,0.656,,1,
-8/13/2019,Saint Marks,SMAR04,Jenn McHenry,1,50,32.8,0.656,,1,
-8/14/2019,Saint Marks,SMAR12,Jenn McHenry,1,50,41.3,0.826,,1,
-8/14/2019,Saint Marks,SMAR12,Jenn McHenry,1,50,41.3,0.826,,1,
-8/14/2019,Saint Marks,SMAR12,Jenn McHenry,1,50,41.3,0.826,,1,
-8/14/2019,Saint Marks,SMAR14,Jenn McHenry,1,50,28.2,0.564,,1,
-8/14/2019,Saint Marks,SMAR14,Jenn McHenry,1,50,28.2,0.564,,1,
-8/20/2019,Saint Marks,SMAR23,Jenn McHenry,1,50,44.9,0.898,,1,
-8/20/2019,Saint Marks,SMAR23,Jenn McHenry,1,50,44.9,0.898,,1,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,1,50,37.8,0.756,,1,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,1,50,37.8,0.756,,1,
-8/20/2019,Saint Marks,SMAR24,Jenn McHenry,1,50,37.8,0.756,,1,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,1,50,37.1,0.742,,1,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,1,50,37.1,0.742,,1,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,1,50,37.1,0.742,,1,
-8/14/2019,Saint Marks,SMAR25,Jenn McHenry,1,50,37.1,0.742,,1,
-8/16/2019,Saint Marks,SMARA,Jenn McHenry,1,34,28.2,0.829411765,,1,
-8/16/2019,Saint Marks,SMARB,Jenn McHenry,1,50,45.2,0.904,,1,
-8/20/2019,Saint Marks,SMARC,Jenn McHenry,1,31.5,26.8,0.850793651,,1,
-6/24/2019,Steinhatchee,STCH01,Jenn McHenry,1,28,18,0.642857143,,1,
+8/13/2019,Saint Marks,SMAR03,Jenn McHenry,2,50,41.1,0.82,,2,
+8/13/2019,Saint Marks,SMAR03,Jenn McHenry,3,50,41.1,0.82,,3,
+8/13/2019,Saint Marks,SMAR04,Jenn McHenry,1,50,32.8,0.66,,1,
+8/13/2019,Saint Marks,SMAR04,Jenn McHenry,2,27,20.6,0.76,,2,
+8/13/2019,Saint Marks,SMAR04,Jenn McHenry,3,50,42.7,0.85,,3,
+8/14/2019,Saint Marks,SMAR12,Jenn McHenry,1,50,41.3,0.83,,1,
+8/14/2019,Saint Marks,SMAR12,Jenn McHenry,2,50,23.6,0.47,,2,
+8/14/2019,Saint Marks,SMAR12,Jenn McHenry,4,50,43.9,0.88,,3,
+8/14/2019,Saint Marks,SMAR14,Jenn McHenry,1,50,28.2,0.56,,1,
+8/14/2019,Saint Marks,SMAR14,Jenn McHenry,2,50,45.5,0.91,,2,
+8/14/2019,Saint Marks,SMAR14,Jenn McHenry,3,50,26.5,0.53,,3,
+8/20/2019,Saint Marks,SMAR23,Jenn McHenry,1,50,44.9,0.90,,1,
+8/20/2019,Saint Marks,SMAR23,Jenn McHenry,2,50,42.5,0.85,,2,
+8/20/2019,Saint Marks,SMAR23,Jenn McHenry,3,33,32.6,0.99,,3,
+8/20/2019,Saint Marks,SMAR24,Jenn McHenry,1,50,37.8,0.76,,1,
+8/20/2019,Saint Marks,SMAR24,Jenn McHenry,2,32,31.9,1.00,,2,
+8/20/2019,Saint Marks,SMAR24,Jenn McHenry,3,50,43.7,0.87,,3,
+8/14/2019,Saint Marks,SMAR25,Jenn McHenry,1,50,37.1,0.74,,1,
+8/14/2019,Saint Marks,SMAR25,Jenn McHenry,2,50,37.5,0.75,,2,
+8/14/2019,Saint Marks,SMAR25,Jenn McHenry,3,50,32.8,0.66,,3,
+8/16/2019,Saint Marks,SMARA,Jenn McHenry,1,34,28.2,0.83,,1,
+8/16/2019,Saint Marks,SMARA,Jenn McHenry,2,50,29.2,0.58,,2,
+8/16/2019,Saint Marks,SMARA,Jenn McHenry,3,50,29,0.58,,3,
+8/16/2019,Saint Marks,SMARB,Jenn McHenry,1,50,45.2,0.90,,1,
+8/16/2019,Saint Marks,SMARB,Jenn McHenry,2,50,43.5,0.87,,2,
+8/16/2019,Saint Marks,SMARB,Jenn McHenry,3,50,41.2,0.82,,3,
+8/20/2019,Saint Marks,SMARC,Jenn McHenry,1,31.5,26.8,0.85,,1,
+8/20/2019,Saint Marks,SMARC,Jenn McHenry,2,31,30.2,0.97,,2,
+8/20/2019,Saint Marks,SMARC,Jenn McHenry,3,33.6,30.5,0.91,,3,
+6/24/2019,Steinhatchee,STCH01,Jenn McHenry,1,28,18,0.64,,1,
+6/24/2019,Steinhatchee,STCH01,Jenn McHenry,2,28,22.5,0.80,,2,
+6/24/2019,Steinhatchee,STCH01,Jenn McHenry,3,50,32,0.64,,3,
 6/24/2019,Steinhatchee,STCH02,Jenn McHenry,1,50,27,0.54,,1,
-6/24/2019,Steinhatchee,STCH04,Jenn McHenry,1,50,46.2,0.924,,1,
+6/24/2019,Steinhatchee,STCH02,Jenn McHenry,2,50,20,0.40,,2,
+6/24/2019,Steinhatchee,STCH02,Jenn McHenry,3,50,28.5,0.57,,3,
+6/24/2019,Steinhatchee,STCH04,Jenn McHenry,1,50,46.2,0.92,,1,
+6/24/2019,Steinhatchee,STCH04,Jenn McHenry,2,50,43,0.86,,2,
+6/24/2019,Steinhatchee,STCH04,Jenn McHenry,3,50,44,0.88,,3,
 6/25/2019,Steinhatchee,STCH05,Jenn McHenry,1,50,38,0.76,,1,
-6/25/2019,Steinhatchee,STCH05,Jenn McHenry,1,50,38,0.76,,1,
+6/25/2019,Steinhatchee,STCH05,Jenn McHenry,2,50,25,0.50,,2,
+6/25/2019,Steinhatchee,STCH05,Jenn McHenry,3,50,47,0.94,,3,Check to make sure the percent cover values shouldn’t be swapped.
+6/25/2019,Steinhatchee,STCH06,Jenn McHenry,6,40,22.2,0.56,3,3,
+6/25/2019,Steinhatchee,STCH06,Jenn McHenry,7,50,45.5,0.91,2,2,
+6/25/2019,Steinhatchee,STCH06,Jenn McHenry,8,50,43.8,0.88,1,1,
 7/30/2019,Steinhatchee,STCH12,Jenn McHenry,1,25,18.5,0.74,,1,Bagged as STCH13
-8/8/2019,Steinhatchee,STCH21,Jenn McHenry,1,44,36.8,0.836363636,,1,
-7/30/2019,Steinhatchee,STCHA,Jenn McHenry,1,19,19,1,,1,NEED TO CHECK THIS ONCE JAKOB PROCESSES IT
-7/30/2019,Steinhatchee,STCHB,Jenn McHenry,1,24.5,11.5,0.469387755,,1,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
-8/8/2019,Steinhatchee,STCHC,Jenn McHenry,1,23,19.2,0.834782609,,1,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
+7/30/2019,Steinhatchee,STCH12,Jenn McHenry,2,22.3,19.8,0.89,,2,Bagged as STCH13
+8/8/2019,Steinhatchee,STCH20,Jenn McHenry,3,30.5,27.5,0.90,,3,Bagged as STCH12
+8/8/2019,Steinhatchee,STCH20,Jenn McHenry,4,29,25,0.86,2,2,
+8/8/2019,Steinhatchee,STCH20,Jenn McHenry,11,33.5,30.5,0.91,1,1,
+8/8/2019,Steinhatchee,STCH21,Jenn McHenry,1,44,36.8,0.84,,1,
+8/8/2019,Steinhatchee,STCH21,Jenn McHenry,2,42.5,30,0.71,,2,
+8/8/2019,Steinhatchee,STCH21,Jenn McHenry,3,42,28.7,0.68,,3,
+7/30/2019,Steinhatchee,STCHA,Jenn McHenry,1,19,19,1.00,,1,NEED TO CHECK THIS ONCE JAKOB PROCESSES IT
+7/30/2019,Steinhatchee,STCHA,Jenn McHenry,2,13,13,1.00,,2,
+7/30/2019,Steinhatchee,STCHA,Jenn McHenry,3,16.5,10.5,0.64,,3,
+7/30/2019,Steinhatchee,STCHB,Jenn McHenry,1,24.5,11.5,0.47,,1,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
+7/30/2019,Steinhatchee,STCHB,Jenn McHenry,2,35,14,0.40,,2,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
+7/30/2019,Steinhatchee,STCHB,Jenn McHenry,3,50,44,0.88,,3,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
+8/8/2019,Steinhatchee,STCHC,Jenn McHenry,1,23,19.2,0.83,,1,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
+8/8/2019,Steinhatchee,STCHC,Jenn McHenry,2,31,22.9,0.74,,2,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
+8/8/2019,Steinhatchee,STCHC,Jenn McHenry,3,30,22.5,0.75,,3,"Sargassum present, boulders under sediment, possibly Oyster Reefs"
