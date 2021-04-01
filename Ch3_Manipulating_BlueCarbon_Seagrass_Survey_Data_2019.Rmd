@@ -99,7 +99,7 @@ df_wide_species_canopy_height$Halodule_wrighti_CH=df_wide_species_canopy_height$
 
 df_wide_species_cover=join(df_wide_species_cover,df_wide_species_canopy_height[c(1,35:39)],by=c("Reference"))
 
-write.csv(df_wide_species_cover,file="Seagrass_Species_Cover_QAQC.csv")
+write.csv(df_wide_species_cover,file="data_output/Seagrass_Species_Cover_QAQC.csv")
 
 ```
 
@@ -182,10 +182,10 @@ df_wide_species_cover_environemntal_factors=cbind(df_wide_species_cover,df_model
 
 names(df_wide_species_cover_environemntal_factors)
 
-df_wide_species_cover_environemntal_factors=df_wide_species_cover_environemntal_factors[c(1:3,13,5:12,14:17,19,32,31,25,26:27,29,22:24,28,30,33,34:38,40:41,44:46,50:52,56:58,68:70,74:76,80:82,92:94,98:100,110:112,117:126)]
+df_wide_species_cover_environemntal_factors=df_wide_species_cover_environemntal_factors[c(1:4,13,5:12,14:17,19,32,31,25,26:27,29,22:24,28,30,33,34:38,40:41,44:46,50:52,56:58,68:70,74:76,80:82,92:94,98:100,110:112,117:126)]
 names(df_wide_species_cover_environemntal_factors)
 
-write.csv(df_wide_species_cover_environemntal_factors,file="Seagrass_Species_Cover_QAQC_with_Environmental_Factors.csv")
+write.csv(df_wide_species_cover_environemntal_factors,file="data_output/Seagrass_Species_Cover_QAQC_with_Environmental_Factors.csv")
 
 
 ```
