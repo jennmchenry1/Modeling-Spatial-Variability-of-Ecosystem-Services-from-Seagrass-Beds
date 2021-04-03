@@ -1,0 +1,8 @@
+Response Variable,Core Depth ,Rsquared,Seagrass P/A,Meadow Type,Total Seagrass Cover,Total Algae Cover,Turtlegrass P/A,Manateegrass P/A,Rhizomes (g/sqm/cm of sediment) ,Seagrass Biomass (g/sqm),Epiphyte Load Index,Chlorophyll (Mean Annual),Current Velocity (Max Annual),Light at Seabed (Mean Annual),Nitrates  (Mean Annual),Salinity (Min Annual),Temperature (Mean Annual),Depth (m),Distant to Nearest River,Distance to Shore,Light at the Surface ,Percent Gravel (%),Percent Sand (%),Percent Silt (%)
+Rhizome Biomass (g per sqm per cm of sediment),Recent ,0.51,,,***,,,**,NA,,,,,,,,,,***,,,,,
+Organic Carbon (gC per sqm per cm of sediment),Full,0.57,,,***,,,,,,,***,,,,,,,,,***,,,**
+Organic Carbon (gC per sqm per cm of sediment),Recent ,0.55,,**,,,,,,,,,**,,,,,,*,,*,,,**
+Organic Carbon (gC per sqm per cm of sediment),Historic,0.55,,,,,,,,,,**,,,.,,,,**,,,,**,
+Inorganic Carbon (gC per sqm per cm of sediment),Full,0.74,,,***,,,,,,,,,,,,,,*,,,***,,***
+Inorganic Carbon (gC per sqm per cm of sediment),Recent ,0.67,,,***,,,,,,,,,,,,,,.,,,***,,***
+Inorganic Carbon (gC per sqm per cm of sediment),Historic,0.63,,,,,,,,,,,,,,,,,**,,,***,,***

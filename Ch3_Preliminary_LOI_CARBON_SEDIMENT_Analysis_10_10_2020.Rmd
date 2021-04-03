@@ -478,7 +478,7 @@ LOI_QAQC_Quadrat_Level_By_DepthBin=LOI_QAQC_By_Site_Slice%>%
                    Rhizome_accum_per_cm=mean(Rhizome_accum_per_cm,na.rm=TRUE),
                    Organic_Carbon_accum_per_cm=mean(Organic_Carbon_accum_per_cm,na.rm=TRUE),
                    Inorganic_Carbon_accum_per_cm=mean(Inorganic_Carbon_accum_per_cm,na.rm=TRUE))%>% # Converting the estiamtes to Value within a squre meter area up to 50cm sediment depth. (and 10 cm depth for rhizomes)
-  dplyr::mutate(Stock_Scaling_Factor=ifelse(Sediment_Depth_Factor=="shallow",15,35),
+  dplyr::mutate(Stock_Scaling_Factor=ifelse(Sediment_Depth_Factor=="shallow",20,35),
                 OM_g_per_sqm=Organic_accum_per_cm*(1/0.0001),
          IOM_accum_per_sqm=Inorganic_accum_per_cm*(1/0.0001),
          Shell_accum_per_sqm=Shell_accum_per_cm*(1/0.0001),
@@ -507,9 +507,9 @@ seagrass_surveys_By_Quadrat=seagrass_surveys_By_Quadrat%>%
 seagrass_survey_AND_Clippings_By_Quadrat=join(seagrass_surveys_By_Quadrat,seagrass_clippings_Quadrat[c(1:2,17,16,13,12,7)],by=c("Site","Quadrat"))
 
 Environmental_Factors_Sites=seagrass_surveys%>%
-  dplyr::select(Site,Latitude,Longitude,Temperature.Mean,Current.Velocity.Mean,Salinity.Min,Chlorophyll.Mean,Nitrate.Mean,Phosphate.Mean,Light.bottom.Min,Par.Mean,Dist_To_River,Dist_To_Shore)%>%
+  dplyr::select(Site,Latitude,Longitude,Temperature.Mean,Depth_m,Secchi_m,Current.Velocity.Max,Salinity.Min,Chlorophyll.Mean,Nitrate.Mean,Phosphate.Mean,Light.bottom.Min,Par.Mean,Dist_To_River,Dist_To_Shore)%>%
   group_by(Site)%>%
-  dplyr::summarize(Latitude=mean(Latitude,na.rm=TRUE),Longitude=mean(Longitude,na.rm=TRUE),Temperature.Mean=mean(Temperature.Mean,na.rm=TRUE),Current.Velocity.Mean=mean(Current.Velocity.Mean,na.rm=TRUE),Salinity.Min=mean(Salinity.Min,na.rm=TRUE),Chlorophyll.Mean=mean(Chlorophyll.Mean,na.rm=TRUE),Nitrate.Mean=mean(Nitrate.Mean,na.rm=TRUE),Phosphate.Mean=mean(Phosphate.Mean,na.rm=TRUE),Light.bottom.Min=mean(Light.bottom.Min,na.rm=TRUE),Par.Mean=mean(Par.Mean,na.rm=TRUE),Dist_To_River=mean(Dist_To_River,na.rm=TRUE),Dist_To_Shore=mean(Dist_To_Shore,na.rm=TRUE))%>%
+  dplyr::summarize(Latitude=mean(Latitude,na.rm=TRUE),Longitude=mean(Longitude,na.rm=TRUE),Depth_m=mean(Depth_m,na.rm=TRUE),Secchi_m=mean(Secchi_m,na.rm=TRUE),Temperature.Mean=mean(Temperature.Mean,na.rm=TRUE),Current.Velocity.Max=mean(Current.Velocity.Max,na.rm=TRUE),Salinity.Min=mean(Salinity.Min,na.rm=TRUE),Chlorophyll.Mean=mean(Chlorophyll.Mean,na.rm=TRUE),Nitrate.Mean=mean(Nitrate.Mean,na.rm=TRUE),Phosphate.Mean=mean(Phosphate.Mean,na.rm=TRUE),Light.bottom.Min=mean(Light.bottom.Min,na.rm=TRUE),Par.Mean=mean(Par.Mean,na.rm=TRUE),Dist_To_River=mean(Dist_To_River,na.rm=TRUE),Dist_To_Shore=mean(Dist_To_Shore,na.rm=TRUE))%>%
   ungroup()
 
 
@@ -523,7 +523,7 @@ Seagrass_Data_Quadrat_Level=seagrass_survey_AND_Clippings_By_Quadrat%>%
          Thalassia_testudinum_g_per_sqm=Thalassia_testudinum_gDW/0.0625,
          Syringodium_filiforme_g_per_sqm=Syringodium_filiforme_gDW/0.0625,
          Halodule_wrightii_g_per_sqm=Halodule_wrightii_gDW/0.0625)%>%
-  dplyr::select(1:3,7:26,44:48,32:43)
+  dplyr::select(1:3,7:26,46:50,32:45)
 
 write.csv(Seagrass_Data_Quadrat_Level,"data_output/Seagrass_Data_QAQC_Quadrat_Level_03_31_2021.csv")
 
@@ -534,13 +534,13 @@ LOI_QAQC_Quadrat_Level_By_DepthBin=plyr::join(LOI_QAQC_Quadrat_Level_By_DepthBin
 #GRAINSIZE ESITMATES #########################################################3
 
 Grainsize_QAQC_Quadrat_Level_By_DepthBin=Grainsize_QAQC%>%
-  mutate(Sediment_Depth_Factor=ifelse(Slice_Number==4 | Slice_Number==9,"shallow","deep"))%>%
+ mutate(Sediment_Depth_Factor=ifelse(Sediment_Depth_cm_uncompressed<=20,"shallow","deep"))%>%
   mutate(Sediment_Depth_Factor=factor(Sediment_Depth_Factor,levels=c("shallow","deep")))%>%
   group_by(Site,Quadrat,Sediment_Depth_Factor)%>%
   dplyr::summarize(Percent_Shell=mean(Percent_Shell,na.rm=TRUE),Percent_Gravel=mean(Percent_Gravel,na.rm=TRUE),Percent_Coarse=mean(Percent_Coarse,na.rm=TRUE),Percent_Medium=mean(Percent_Medium,na.rm=TRUE),Percent_Fine=mean(Percent_Fine,na.rm=TRUE),Percent_Silt=mean(Percent_Silt,na.rm=TRUE))%>%
   ungroup()
 
-Grainsize_QAQC_Quadrat_Level_By_DepthBin[is.na(Grainsize_QAQC_Quadrat_Level_By_DepthBin)] <- NA
+# Grainsize_QAQC_Quadrat_Level_By_DepthBin[is.na(Grainsize_QAQC_Quadrat_Level_By_DepthBin)] <- NA
 
 
 ```
@@ -562,20 +562,18 @@ LOI_QAQC_Site_Level_By_DepthBin=LOI_QAQC_Quadrat_Level_By_DepthBin%>%
 
 
 Seagrass_Data_Site_Level=Seagrass_Data_Quadrat_Level%>%
-  group_by(Region,Site,Factor,Seagrass_Landscape)%>%
-  summarize_at(vars(month:Dist_To_Shore),mean,na.rm=TRUE)
+  dplyr::group_by(Region,Site,Factor,Seagrass_Landscape)%>%
+  dplyr::summarize_all(mean,na.rm=TRUE)
 
 
 
-Grainsize_QAQC_Site_Level_By_DepthBin=Grainsize_QAQC%>%
-    mutate(Sediment_Depth_Factor=ifelse(Slice_Number==4 | Slice_Number==9,"shallow","deep"))%>%
-  mutate(Sediment_Depth_Factor=factor(Sediment_Depth_Factor,levels=c("shallow","deep")))%>%
+Grainsize_QAQC_Site_Level_By_DepthBin=Grainsize_QAQC_Quadrat_Level_By_DepthBin%>%
   group_by(Site,Sediment_Depth_Factor)%>%
   dplyr::summarize(Percent_Shell=mean(Percent_Shell,na.rm=TRUE),Percent_Gravel=mean(Percent_Gravel,na.rm=TRUE),Percent_Coarse=mean(Percent_Coarse,na.rm=TRUE),Percent_Medium=mean(Percent_Medium,na.rm=TRUE),Percent_Fine=mean(Percent_Fine,na.rm=TRUE),Percent_Silt=mean(Percent_Silt,na.rm=TRUE))%>%
   ungroup()
 names(Grainsize_QAQC_Site_Level_By_DepthBin)
 
-Grainsize_QAQC_Site_Level_By_DepthBin[is.na(Grainsize_QAQC_Site_Level_By_DepthBin)] <- NA
+# Grainsize_QAQC_Site_Level_By_DepthBin[is.na(Grainsize_QAQC_Site_Level_By_DepthBin)] <- NA
 
 
 ```
@@ -591,6 +589,8 @@ BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=plyr::join(LOI_QAQC_Quadrat_Level_By_D
 BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=plyr::join(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,Grainsize_QAQC_Quadrat_Level_By_DepthBin,by=c("Site","Quadrat","Sediment_Depth_Factor"),match="all",type="left")
 
 
+#There are NAs because some of the cores don't have a deep grainsize slice.
+
 New_Dist_To_River<-read.csv("arc_output/New_Dist_To_River_Calculation.csv")
 Meadow_Structure<-read.csv("data/Carbon/Seagrass_Meadow_Type_Data_QAQC_2019.csv")
 
@@ -603,7 +603,7 @@ BlueCarbon_QAQC_Quadrat_Level_By_DepthBin$Dist_To_River<-BlueCarbon_QAQC_Quadrat
 
 names(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin)
 
-BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin[c(1,3:20,22:57)]%>%
+BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin[c(1,3:20,22:59)]%>%
   mutate(Cover_Level=ifelse(Total_Seagrass_Cover>=50,"high",ifelse(Total_Seagrass_Cover<50 & Total_Seagrass_Cover>=5,"low",ifelse(Total_Seagrass_Cover<5,"none", NA))))%>%
   mutate(TH_PA=ifelse(Thalassia.testudinum>0,1,0),SY_PA=ifelse(Syringodium.filiforme>0,1,0),HA_PA=ifelse(Halodule.wrightii>0,1,0),TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA))# %>%
    #mutate(Factor=ifelse(Cover_Level=="none","Control","Seagrass"))
@@ -621,6 +621,7 @@ names(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin)
 
 #Site Level
 BlueCarbon_QAQC_Site_Level_By_DepthBin=plyr::join(LOI_QAQC_Site_Level_By_DepthBin,Seagrass_Data_Site_Level,by=c("Site","Factor"),match="all",type="left")
+names(BlueCarbon_QAQC_Site_Level_By_DepthBin)
 
 
 BlueCarbon_QAQC_Site_Level_By_DepthBin=plyr::join(BlueCarbon_QAQC_Site_Level_By_DepthBin,Grainsize_QAQC_Site_Level_By_DepthBin,by=c("Site","Sediment_Depth_Factor"),match="all",type="left")
@@ -635,7 +636,7 @@ BlueCarbon_QAQC_Site_Level_By_DepthBin$Dist_To_River<-BlueCarbon_QAQC_Site_Level
 
 names(BlueCarbon_QAQC_Site_Level_By_DepthBin)
 
-BlueCarbon_QAQC_Site_Level_By_DepthBin=BlueCarbon_QAQC_Site_Level_By_DepthBin[c(1:11,13:54)]%>%
+BlueCarbon_QAQC_Site_Level_By_DepthBin=BlueCarbon_QAQC_Site_Level_By_DepthBin[c(1:11,13:57)]%>%
   mutate(Cover_Level=ifelse(Total_Seagrass_Cover>=50,"high",ifelse(Total_Seagrass_Cover<50 & Total_Seagrass_Cover>=5,"low",ifelse(Total_Seagrass_Cover<5,"none", NA))))%>%
   mutate(TH_PA=ifelse(Thalassia.testudinum>0,1,0),SY_PA=ifelse(Syringodium.filiforme>0,1,0),HA_PA=ifelse(Halodule.wrightii>0,1,0),TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA)) %>%
    mutate(Factor=ifelse(Cover_Level=="none","Control","Seagrass"))

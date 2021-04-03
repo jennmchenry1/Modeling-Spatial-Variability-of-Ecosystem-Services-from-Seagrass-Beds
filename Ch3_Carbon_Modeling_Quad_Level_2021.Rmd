@@ -1,0 +1,1270 @@
+---
+title: "Ch3_Carbon_Modeling_2021"
+author: "Jenn_McHenry"
+date: "4/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(plyr)
+library(raster)
+library(sp)
+library(ggplot2)
+library(mgcv)
+library(gamm4)
+library(nnet)
+library(MuMIn)
+library(doSNOW)
+library(usethis);library(devtools)
+devtools::install_github("beckyfisher/FSSgam_package") #run once
+library(FSSgam)
+library(gratia)
+```
+
+#Loading modeling datasets
+```{r}
+
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Datasets.RData")
+
+
+ls()
+
+rm(list= ls()[!(ls() %in% c("BlueCarbon_QAQC_Quadrat_Level_By_DepthBin","BlueCarbon_QAQC_Site_Level_By_DepthBin"))])
+
+#prepping the quadrat level data to run models
+BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Factor=as.factor(Factor))%>%
+  mutate(Depth_m=ifelse(Region=="Saint Marks" & is.na(Depth_m)==TRUE,0.792,Depth_m),
+         Secchi_m=ifelse(Region=="Saint Marks" & is.na(Secchi_m)==TRUE,0.401,Secchi_m))%>%
+  mutate(Thalassia.testudinum.AreaCover=(Thalassia.testudinum/100 *Total_Seagrass_Cover/100)*100,
+         Syringodium.filiforme.AreaCover=(Syringodium.filiforme/100 * Total_Seagrass_Cover/100)*100,
+         Halodule.wrightii.AreaCover=(Halodule.wrightii/100 * Total_Seagrass_Cover/100)*100)%>%
+  mutate_at(vars(Seagrass_Biomass_g_per_sqm , Macro_Algae_Biomass_g_per_sqm, Thalassia_testudinum_g_per_sqm ,Syringodium_filiforme_g_per_sqm,Halodule_wrightii_g_per_sqm), ~replace_na(., 0))%>%
+  mutate(Meadow.Type=ifelse(Meadow.Structure=="Bare",0,ifelse(Meadow.Structure=="Fragmented",1,2)))%>%
+  mutate(Epiphyte_Load=(Epiphite_Blade_Load/100)*(Epiphite_Shoot_Load/100)*100,
+         Percent_Sands=(Percent_Coarse+Percent_Medium+Percent_Fine))
+
+BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  mutate(Meadow.Type=as.factor(Meadow.Type),Site=as.factor(Site))
+
+BlueCarbon_QAQC_Quadrat_Level_By_DepthBin$Reference<-paste(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin$Site,BlueCarbon_QAQC_Quadrat_Level_By_DepthBin$Quadrat,sep="_")
+
+BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=unique(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin)
+
+# BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin[complete.cases(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin),] #There are some slices that don't have deep equivalents. So I will remove them. 
+
+dim(BlueCarbon_QAQC_Quadrat_Level_By_DepthBin)
+
+
+#prepping the site level data to run models
+BlueCarbon_QAQC_Site_Level_By_DepthBin=BlueCarbon_QAQC_Site_Level_By_DepthBin%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Factor=as.factor(Factor))%>%
+  mutate(Depth_m=ifelse(Region=="Saint Marks" & is.na(Depth_m)==TRUE,0.792,Depth_m),
+         Secchi_m=ifelse(Region=="Saint Marks" & is.na(Secchi_m)==TRUE,0.401,Secchi_m))%>%
+  mutate(Thalassia.testudinum.AreaCover=(Thalassia.testudinum/100 *Total_Seagrass_Cover/100)*100,
+         Syringodium.filiforme.AreaCover=(Syringodium.filiforme/100 * Total_Seagrass_Cover/100)*100,
+         Halodule.wrightii.AreaCover=(Halodule.wrightii/100 * Total_Seagrass_Cover/100)*100)%>%
+  mutate_at(vars(Seagrass_Biomass_g_per_sqm , Macro_Algae_Biomass_g_per_sqm, Thalassia_testudinum_g_per_sqm ,Syringodium_filiforme_g_per_sqm,Halodule_wrightii_g_per_sqm), ~replace_na(., 0))%>%
+  mutate(Meadow.Type=ifelse(Meadow.Structure=="Bare",0,ifelse(Meadow.Structure=="Fragmented",1,2)))%>%
+  mutate(Epiphyte_Load=(Epiphite_Blade_Load/100)*(Epiphite_Shoot_Load/100)*100,
+         Percent_Sands=(Percent_Coarse+Percent_Medium+Percent_Fine))%>%
+  mutate(Meadow.Type=as.factor(Meadow.Type),Site=as.factor(Site))
+
+#Modeling Variables
+cat.preds=c("TH_PA","SY_PA","HA_PA","Factor")
+null.vars=c("Region","Site")
+cont.preds=c("Depth_m", "Dist_To_Shore", "Dist_To_River", "Nitrate.Mean",
+             "Par.Mean", "Light.bottom.Min",
+             "Rhizome_Stock_g_per_sqm",
+"Seagrass_Biomass_g_per_sqm",
+             "Total_Seagrass_Cover","Total_Algae_Cover",
+             "Thalassia.testudinum, Syringodium.filiforme",
+             "Halodule.wrightii",
+             "Percent_Gravel", "Percent_Coarse", "Percent_Medium", "Percent_Fine", "Percent_Silt")
+
+```
+
+#GAMs for Biomass Stocks Quad-Level
+```{r}
+
+#Shallow vs deep dataframes
+Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="shallow")
+
+Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="deep")
+
+Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  dplyr::select(-Sediment_Depth_Factor)%>%
+  mutate(TH_PA=as.integer(TH_PA),SY_PA=as.integer(SY_PA),HA_PA=as.integer(HA_PA),Meadow.Type=as.integer(Meadow.Type))%>%
+  dplyr::group_by(Reference,Region,Site,Quadrat,Factor,Meadow.Type,Meadow.Structure,Cover_Level)%>%
+  dplyr::summarize_all(mean,na.rm=TRUE)
+
+
+#Biomass Rhizome Model #####################################
+full_model_biomass_shallow=gam((Seagrass_Biomass_g_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(full_model_biomass_shallow)
+
+
+seagrass_only_model_biomass_shallow=gam((Seagrass_Biomass_g_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(seagrass_only_model_biomass_shallow)
+  
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_biomass_shallow=gam((Seagrass_Biomass_g_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+
+                                        # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4)+
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4)+
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_biomass_shallow)
+
+
+draw(stepwise_model_biomass_shallow)
+
+AIC(full_model_rhizome_shallow,seagrass_only_model_rhizome_shallow,stepwise_model_rhizome_shallow)
+
+gam.check(stepwise_model_rhizome_shallow)
+
+shapiro.test(stepwise_model_rhizome_shallow$residuals)
+
+
+
+
+```
+
+#GAM Rhizomes Stock Quad-Level
+```{r}
+Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="shallow")
+
+Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="deep")
+
+
+#Shallow Rhizome Model #####################################
+full_model_rhizome_shallow=gam((Rhizome_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(full_model_rhizome_shallow)
+
+
+seagrass_only_model_rhizome_shallow=gam((Rhizome_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    TH_PA +
+                    # SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4),
+                    # s(Total_Algae_Cover,bs="ts",k=4),
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4),
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    # s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(seagrass_only_model_rhizome_shallow)
+  
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_rhizome_shallow=gam((Rhizome_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                                        # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4),
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4),
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    # s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_rhizome_shallow)
+
+
+draw(stepwise_model_rhizome_shallow)
+
+AIC(full_model_rhizome_shallow,seagrass_only_model_rhizome_shallow,stepwise_model_rhizome_shallow)
+
+gam.check(stepwise_model_rhizome_shallow)
+
+shapiro.test(stepwise_model_rhizome_shallow$residuals)
+
+
+
+
+
+```
+
+#GAM Organic Carbon Stock SHALLOW VS DEEP Quad-Level
+```{r}
+
+#FULL Core Model OC #####################################
+full_model_OCD=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(full_model_OCD)
+
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_OCD=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                    # Sediment_Depth_Factor,
+                    # data=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+                    data=Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_OCD)
+
+draw(stepwise_model_OCD)
+
+AIC(full_model_OCD,stepwise_model_OCD)
+
+gam.check(stepwise_model_OCD)
+
+shapiro.test(stepwise_model_OCD$residuals)
+
+
+
+#Shallow Core Model OC #####################################
+full_model_OCD_shallow=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(full_model_OCD_shallow)
+
+
+seagrass_only_model_OCD_shallow=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(seagrass_only_model_OCD_shallow)
+  
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_OCD_shallow=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_OCD_shallow)
+
+cor(BlueCarbon_QAQC_Site_Level_By_DepthBin$Light.bottom.Min,BlueCarbon_QAQC_Site_Level_By_DepthBin$Chlorophyll.Mean)
+
+draw(stepwise_model_OCD_shallow)
+
+AIC(full_model_OCD_shallow,seagrass_only_model_OCD_shallow,stepwise_model_OCD_shallow)
+
+gam.check(stepwise_model_OCD_shallow)
+
+shapiro.test(stepwise_model_OCD_shallow$residuals)
+
+
+
+
+
+
+#Historic Core Model OC####################################
+
+full_model_OCD_deep=gam((OC_Stock_accum_per_sqm) ~
+                                   
+                                 #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+                  
+summary(full_model_OCD_deep)
+
+
+
+seagrass_only_model_OCD_deep=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(seagrass_only_model_OCD_deep)
+  
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_OCD_deep=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4)+,
+                    s(Percent_Sands,bs="ts",k=4),
+                    # s(Percent_Silt,bs="ts",k=4),
+                     data=Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_OCD_deep)
+
+draw(stepwise_model_OCD_deep)
+
+AIC(full_model_OCD_shallow,seagrass_only_model_OCD_deep,stepwise_model_OCD_deep)
+
+gam.check(stepwise_model_OCD_deep)
+
+shapiro.test(stepwise_model_OCD_shallow$residuals)
+
+
+```
+
+#GAM Inorganic Carbon Stock SHALLOW VS DEEPQuad-Level
+```{r}
+
+#FULL Core Model OC #####################################
+full_model_IOCD=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                    data=Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+                    #  # 
+
+summary(full_model_IOCD)
+
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_IOCD=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                    #                       Sediment_Depth_Factor,
+                    # data=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+                    data=Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+                    #  # 
+
+summary(stepwise_model_IOCD)
+
+draw(stepwise_model_IOCD)
+
+AIC(full_model_OCD,stepwise_model_OCD)
+
+gam.check(stepwise_model_OCD)
+
+shapiro.test(stepwise_model_OCD$residuals)
+
+
+
+#Shallow Core Model Inorganic C #####################################
+full_model_IOCD_shallow=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(full_model_IOCD_shallow)
+
+
+seagrass_only_model_IOCD_shallow=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(seagrass_only_model_IOCD_shallow)
+  
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_IOCD_shallow=gam((IOC_Stock_accum_per_sqm) ~ 
+                   #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=3)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Oceanographic Variables
+                    # s(Salinity.Min,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River, bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4),
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_IOCD_shallow)
+
+draw(stepwise_model_IOCD_shallow)
+
+cor(Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin$Nitrate.Mean,Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin$Temperature.Mean)
+
+AIC(full_model_IOCD_shallow,seagrass_only_model_IOCD_shallow,stepwise_model_IOCD_shallow)
+
+gam.check(stepwise_model_IOCD_shallow)
+
+shapiro.test(stepwise_model_OCD_shallow$residuals)
+
+#Historic Core Model OC####################################
+
+full_model_IOCD_deep=gam((IOC_Stock_accum_per_sqm) ~
+                                   
+                                 #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    TH_PA +
+                    SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    s(Dist_To_Shore,bs="ts",k=4) +
+                    s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+                  
+summary(full_model_IOCD_deep)
+
+
+
+seagrass_only_model_IOCD_deep=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(seagrass_only_model_IOCD_deep)
+  
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_IOCD_deep=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) + 
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4),
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_IOCD_deep)
+
+draw(stepwise_model_IOCD_deep)
+
+AIC(full_model_IOCD_deep,seagrass_only_model_IOCD_deep,stepwise_model_OCD_deep)
+
+gam.check(stepwise_model_OCD_deep)
+
+shapiro.test(stepwise_model_OCD_shallow$residuals)
+
+
+```
+
+##################################################################
+#GAM Seagrass Biomass Site-Level
+```{r}
+#Shallow vs deep dataframes
+Shallow_BlueCarbon_QAQC_Site_Level_By_DepthBin=BlueCarbon_QAQC_Site_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="shallow")
+
+Deep_BlueCarbon_QAQC_Site_Level_By_DepthBin=BlueCarbon_QAQC_Site_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="deep")
+
+Full_BlueCarbon_QAQC_Site_Level_By_DepthBin=BlueCarbon_QAQC_Site_Level_By_DepthBin%>%
+  dplyr::select(-Sediment_Depth_Factor)%>%
+  mutate(TH_PA=as.integer(TH_PA),SY_PA=as.integer(SY_PA),HA_PA=as.integer(HA_PA),Meadow.Type=as.integer(Meadow.Type))%>%
+  dplyr::group_by(Region,Site,Factor,Meadow.Type,Meadow.Structure,Cover_Level)%>%
+  dplyr::summarize_all(mean,na.rm=TRUE)%>%
+    mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Meadow.Type=as.factor(Meadow.Type))
+
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_biomass_shallow_SL=gam((Seagrass_Biomass_g_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    s(Total_Algae_Cover,bs="ts",k=4),
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4),
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4)+
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4)+
+                    # s(Percent_Sands,bs="ts",k=4) ,
+                    # s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_biomass_shallow_SL)
+
+
+draw(stepwise_model_biomass_shallow_SL)
+
+saveRDS(stepwise_model_biomass_shallow_SL,"model_versions/seagrass_biomass_sqm_SL.rds")
+
+gam.check((stepwise_model_biomass_shallow_SL))
+
+shapiro.test(stepwise_model_biomass_shallow_SL
+$residuals)
+
+
+```
+
+#GAM Rhizomes Stock Site-Level
+```{r}
+Shallow_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="shallow")
+
+Deep_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin=BlueCarbon_QAQC_Quadrat_Level_By_DepthBin%>%
+  filter(Sediment_Depth_Factor=="deep")
+
+
+stepwise_model_rhizome_shallow_SL=gam((Rhizome_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    SY_PA +
+                    # Meadow.Type +
+                    s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                                        # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Salinity.Min,bs="ts",k=4) +
+                    # s(Temperature.Mean,bs="ts",k=4),
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4),
+                    # s(Dist_To_Shore,bs="ts",k=4),
+                    # s(Par.Mean,bs="ts",k=4),
+                    # s(Percent_Gravel,bs="ts",k=4),
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    # s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_rhizome_shallow_SL)
+
+draw(stepwise_model_rhizome_shallow_SL)
+
+AIC(full_model_rhizome_shallow,seagrass_only_model_rhizome_shallow,stepwise_model_rhizome_shallow)
+
+gam.check(stepwise_model_rhizome_shallow_SL)
+
+shapiro.test(stepwise_model_rhizome_shallow$residuals)
+
+saveRDS(stepwise_model_rhizome_shallow_SL,"model_versions/seagrass_rhizome_accum_sqm_cm_SL.rds")
+
+```
+
+#GAM Organic Carbon Stock SHALLOW VS DEEP Site-Level
+```{r}
+#FULL Core Model OC #####################################
+#too many covariates to consider all at once.
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_OCD_SL=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    # s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    # Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                    # Sediment_Depth_Factor,
+                    # data=BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+                    data=Full_BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+       
+
+summary(stepwise_model_OCD_SL)
+
+draw(stepwise_model_OCD_SL)
+
+AIC(stepwise_model_OCD_SL)
+
+gam.check(stepwise_model_OCD_SL)
+
+shapiro.test(stepwise_model_OCD_SL$residuals)
+
+saveRDS(stepwise_model_OCD_SL,"model_versions/organic_carbon_accum_sqm_cm_SL.rds")
+
+#Shallow Core Model OC #####################################
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_OCD_shallow_SL=gam((OC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    Factor+
+                    HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                                        data=Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin, method="ML")
+
+                    
+
+#Historic Core Model OC####################################
+
+stepwise_model_OCD_deep_SL=gam((OC_Stock_accum_per_sqm) ~
+                    #Seagrass Variables
+                    Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+ 
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4), 
+                    data=Full_BlueCarbon_QAQC_Quadrat_Level_By_DepthBin, method="ML")
+                  
+summary(stepwise_model_OCD_deep_SL)
+
+draw(stepwise_model_OCD_deep_SL)
+gam.check(stepwise_model_OCD_deep)
+
+shapiro.test(stepwise_model_OCD_shallow$residuals)
+
+
+```
+
+#GAM Inorganic Carbon Stock SHALLOW VS DEEPQuad-Level
+```{r}
+
+#FULL Core Model IOC #####################################
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_IOCD_SL=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    # s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                    # Sediment_Depth_Factor,
+                     # data=BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+                   data=Full_BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_IOCD_SL)
+
+draw(stepwise_model_IOCD_SL)
+
+gam.check(stepwise_model_IOCD_SL)
+
+shapiro.test(stepwise_model_IOCD_SL$residuals)
+
+
+
+#Shallow Core Model Inorganic C #####################################
+
+stepwise_model_IOCD_shallow_SL=gam((IOC_Stock_accum_per_sqm) ~ 
+                   #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    # Oceanographic Variables
+                    # s(Salinity.Min,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River, bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    # s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Shallow_BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_IOCD_shallow_SL)
+
+draw(stepwise_model_IOCD_shallow_SL)
+
+gam.check(stepwise_model_IOCD_shallow_SL)
+
+shapiro.test(stepwise_model_IOCD_shallow_SL$residuals)
+
+#Historic Core Model OC####################################
+
+#final model from site level was par, velocity, distance to river, silt and meadow type. 
+
+stepwise_model_IOCD_deep_SL=gam((IOC_Stock_accum_per_sqm) ~ 
+                    #Seagrass Variables
+                    # Factor+
+                    # HA_PA +
+                    # TH_PA +
+                    # SY_PA +
+                    # Meadow.Type +
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                    # s(Total_Algae_Cover,bs="ts",k=4)+
+                    # s(Rhizome_accum_per_sqm,bs="ts",k=4)+
+                    # s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4)+
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                    #Oceanographic Variables
+                    # s(Chlorophyll.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                    # s(Light.bottom.Min,bs="ts",k=4)+
+                    # s(Nitrate.Mean,bs="ts",k=4)+
+                    # s(Salinity.Min,bs="ts",k=4)   +
+                    s(Temperature.Mean,bs="ts",k=4)+
+                    #Physical Variables
+                    # s(Depth_m,bs="ts",k=4) +
+                    # s(Dist_To_River,bs="ts",k=4) +
+                    # s(Dist_To_Shore,bs="ts",k=4) +
+                    # s(Par.Mean,bs="ts",k=4)+
+                    s(Percent_Gravel,bs="ts",k=4) +
+                    # s(Percent_Sands,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4),
+                     data=Deep_BlueCarbon_QAQC_Site_Level_By_DepthBin,method="ML")
+
+summary(stepwise_model_IOCD_deep_SL)
+
+draw(stepwise_model_IOCD_deep_SL)
+
+gam.check(stepwise_model_IOCD_deep_SL)
+
+shapiro.test(stepwise_model_OCD_shallow$residuals)
+
+
+```
+
+
+#saving modeling ouput
+```{r}
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Modeling_Spring2021_Shallow_Vs_Deep.RData")
+
+```

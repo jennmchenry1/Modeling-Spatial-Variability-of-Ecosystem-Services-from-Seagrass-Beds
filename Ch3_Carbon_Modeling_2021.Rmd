@@ -1,0 +1,748 @@
+---
+title: "Ch3_Carbon_Modeling_2021"
+author: "Jenn_McHenry"
+date: "4/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(plyr)
+library(raster)
+library(sp)
+library(ggplot2)
+library(mgcv)
+library(gamm4)
+library(nnet)
+library(MuMIn)
+library(doSNOW)
+library(usethis);library(devtools)
+devtools::install_github("beckyfisher/FSSgam_package") #run once
+library(FSSgam)
+library(gratia)
+```
+
+#Loading modeling datasets
+```{r}
+
+load(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Datasets.RData")
+
+
+ls()
+
+rm(list= ls()[!(ls() %in% c("BlueCarbon_QAQC", "LOI_QAQC_By_Site_Slice","seagrass_survey_AND_Clippings_By_Site"))])
+
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Factor=as.factor(Factor))%>%
+  mutate(Depth_m=ifelse(Region=="Saint Marks" & is.na(Depth_m)==TRUE,0.792,Depth_m),
+         Secchi_m=ifelse(Region=="Saint Marks" & is.na(Secchi_m)==TRUE,0.401,Secchi_m))%>%
+  mutate(FWCC_Seagrass_Extent=ifelse(is.na(FWCC_Seagrass_Extent)==TRUE,"None",FWCC_Seagrass_Extent))
+
+
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(Thalassia.testudinum.AreaCover=(Thalassia.testudinum/100 *Total_Seagrass_Cover/100)*100,
+         Syringodium.filiforme.AreaCover=(Syringodium.filiforme/100 * Total_Seagrass_Cover/100)*100,
+         Halodule.wrightii.AreaCover=(Halodule.wrightii/100 * Total_Seagrass_Cover/100)*100)
+
+BlueCarbon_QAQC<-BlueCarbon_QAQC%>%
+  mutate_at(vars(Seagrass_Biomass_g_per_sqm , Macro_Algae_Biomass_g_per_sqm, Thalassia_testudinum_g_per_sqm ,Syringodium_filiforme_g_per_sqm,Halodule_wrightii_g_per_sqm), ~replace_na(., 0))
+
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(Epiphyte_Load=(Epiphite_Blade_Load/100)*(Epiphite_Shoot_Load/100)*100)
+
+BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
+
+
+#Modeling Variables
+# cat.preds=c("TH_PA","SY_PA","HA_PA","Factor")
+# null.vars=c("Region","Site")
+# cont.preds=c("Depth_m", "Dist_To_Shore", "Dist_To_River", "Nitrate.Mean",
+#              "Par.Mean", "Light.bottom.Min",
+#              "Rhizome_Stock_g_per_sqm",
+#              "Seagrass_Biomass_g_per_sqm",
+#              "Total_Seagrass_Cover","Total_Algae_Cover",
+#              "Thalassia.testudinum, Syringodium.filiforme",
+#              "Halodule.wrightii",
+#              "Percent_Gravel", "Percent_Coarse", "Percent_Medium", "Percent_Fine", "Percent_Silt")
+
+```
+
+#GAMs for Biomass Stocks
+```{r}
+
+names(BlueCarbon_QAQC)
+
+
+# Depth_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~ s(Depth_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Depth_model_BIOMASS)
+# 
+# Secchi_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Secchi_model_BIOMASS)
+
+Epiphytes_Structure=gam((Seagrass_Biomass_g_per_sqm)~ s(Epiphyte_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Epiphytes_Structure)
+
+Meadow_Structure=gam((Seagrass_Biomass_g_per_sqm)~ Meadow.Structure, data=BlueCarbon_QAQC,method="ML")
+summary(Meadow_Structure)
+
+Seagrass_Cover_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm )~ s(Total_Seagrass_Cover,bs="ts",k=4) +s(Total_Algae_Cover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Seagrass_Cover_model_BIOMASS)
+# plot(Seagrass_Cover_model_BIOMASS)
+
+SPP_PA_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~ TH_PA + HA_PA +SY_PA, data=BlueCarbon_QAQC,method="ML")
+summary(SPP_PA_model_BIOMASS)
+
+Seagrass_Spp_Cover_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm )~ s(Thalassia.testudinum.AreaCover,bs="ts",k=4) + s(Syringodium.filiforme.AreaCover,bs="ts",k=4) + s(Halodule.wrightii.AreaCover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+summary(Seagrass_Spp_Cover_model_BIOMASS)
+
+# Sand_model_BIOMASS=gam(Seagrass_Biomass_g_per_sqm ~ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Sand_model_BIOMASS)
+
+# Sediment_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Sediment_model_BIOMASS)
+
+Salinity_min_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Salinity_min_model_BIOMASS)
+
+
+Current_velocity_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Current_velocity_model_BIOMASS)
+
+
+# PP_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(PP_model_BIOMASS)
+
+# Temperature_Mean_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Temperature_Mean_model_BIOMASS)
+
+# Nitrate_Mean_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Nitrate_Mean_model_BIOMASS)
+# 
+# Par_Mean_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Par.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Par_Mean_model_BIOMASS)
+
+Light_Min_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ s(Light.bottom.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Light_Min_model_BIOMASS)
+
+# Dist_To_Shore_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_To_Shore_model_BIOMASS)
+
+# Dist_from_River_Shore_model_Biomass=gam((Seagrass_Biomass_g_per_sqm) ~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_from_River_Shore_model_Biomass)
+
+Treatment_Mean_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm)~ Factor, data=BlueCarbon_QAQC,method="ML")
+summary(Treatment_Mean_model_BIOMASS)
+
+
+cor(BlueCarbon_QAQC[c(cont.preds,"Organic_Carbon_Stock_g_per_sqm")],)
+
+
+
+full_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~
+    s(Depth_m,bs="ts",k=4)   +
+     s(Salinity.Min,bs="ts",k=4)   +
+    # s(Primary.productivity.Max,bs="ts",k=4)+
+     s(Current.Velocity.Max,bs="ts",k=4)+
+     s(Temperature.Mean,bs="ts",k=4)+
+    s(Light.bottom.Min,bs="ts",k=4)   +
+    s(Nitrate.Mean,bs="ts",k=4)   +
+    s(Dist_To_River,bs="ts",k=4)   +
+    s(Total_Seagrass_Cover,bs="ts",k=4) + 
+      s(Total_Algae_Cover,bs="ts",k=4)   + 
+      s(Epiphite_Shoot_Load,bs="ts",k=4)+
+                      # as.factor(Factor) +
+      Meadow.Structure+
+      # SY_PA+
+      # HA_PA+
+                     TH_PA,
+                   data=BlueCarbon_QAQC,method="ML")
+
+summary(full_model_BIOMASS)
+
+
+
+stepwise_model_BIOMASS=gam((Seagrass_Biomass_g_per_sqm) ~
+    # s(Depth_m,bs="ts",k=4)   +
+     # s(Salinity.Min,bs="ts",k=4)   +
+    # s(Primary.productivity.Max,bs="ts",k=4)+
+     # s(Current.Velocity.Max,bs="ts",k=4)+
+     # s(Temperature.Mean,bs="ts",k=4)+
+    s(Light.bottom.Min,bs="ts",k=4)   +
+    # s(Nitrate.Mean,bs="ts",k=4)   +
+    # s(Dist_To_River,bs="ts",k=4)   +
+    s(Total_Seagrass_Cover,bs="ts",k=4) + 
+      s(Total_Algae_Cover,bs="ts",k=4)   + 
+      # s(Epiphite_Shoot_Load,bs="ts",k=4)+
+                      # as.factor(Factor) +
+      # Meadow.Structure+
+      # SY_PA+
+      # HA_PA+
+                     TH_PA,
+                   data=BlueCarbon_QAQC,method="ML")
+
+summary(stepwise_model_BIOMASS)
+
+draw(stepwise_model_BIOMASS)
+gam.check(stepwise_model_BIOMASS)
+
+AIC(full_model_BIOMASS,stepwise_model_BIOMASS)
+
+shapiro.test(stepwise_model_BIOMASS$residuals)
+
+```
+
+#GAM Rhizomes Stocks
+```{r}
+
+names(BlueCarbon_QAQC)
+summary(BlueCarbon_QAQC)
+
+# Secchi_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Secchi_model_Rhiz)
+# plot(Secchi_model_OCD)
+
+Depth_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ s(Depth_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Depth_model_Rhiz)
+
+#
+Seagrass_Spp_Cover_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~  s(Total_Seagrass_Cover,bs="ts",k=4) +s(Total_Algae_Cover,bs="ts",k=4) ,
+                                  # + Factor,
+                                  data=BlueCarbon_QAQC,method="ML")
+
+summary(Seagrass_Spp_Cover_model_Rhiz)
+plot(Seagrass_Spp_Cover_model_Rhiz)
+
+SPP_PA_model_Rhiz=gam((Rhizome_Stock_g_per_sqm) ~ TH_PA + HA_PA +SY_PA, data=BlueCarbon_QAQC,method="ML")
+summary(SPP_PA_model_Rhiz)
+
+# Seagrass_Spp_Cover_model_Rhiz=gam((Rhizome_Stock_g_per_sqm )~ s(Thalassia.testudinum.AreaCover,bs="ts",k=4) + s(Syringodium.filiforme.AreaCover,bs="ts",k=4) + s(Halodule.wrightii.AreaCover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# 
+# summary(Seagrass_Spp_Cover_model_Rhiz)
+
+
+Epiphytes_Structure_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Epiphyte_Load,bs="ts",k=4)
+, data=BlueCarbon_QAQC,method="ML")
+summary(Epiphytes_Structure_Rhiz)
+draw(Epiphytes_Structure_Rhiz)
+
+# Sand_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Sand_model_Rhiz)
+# plot(Sand_model,trans=exp)
+
+# Sediment_model_Rhiz=gam(log(Organic_Carbon_Stock_g_per_sqm)~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Sediment_model_Rhiz)
+# plot(Sediment_model_,trans=exp)
+
+Silt_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Percent_Silt,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Silt_model_Rhiz)
+plot(Silt_model_Rhiz)
+
+Nitrate_Mean_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Nitrate_Mean_model_Rhiz)
+plot(Nitrate_Mean_model_Rhiz)
+
+Salinity_min_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Salinity_min_model_Rhiz)
+
+Current_velocity_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Current_velocity_model_Rhiz)
+
+PP_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(PP_model_Rhiz)
+
+Temperature_Mean_model_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Temperature_Mean_model_Rhiz)
+
+# Par_Mean_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Par.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Par_Mean_model_Rhiz)
+# plot(Par_Mean_model,trans=exp)
+
+Light_Min_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Light.bottom.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Light_Min_model_Rhiz)
+plot(Light_Min_model_Rhiz)
+
+# Dist_To_Shore_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_To_Shore_model_Rhiz)
+# plot(Dist_To_Shore_model_Rhiz)
+
+Dist_from_River_Shore_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Dist_from_River_Shore_model_Rhiz)
+plot(Dist_from_River_Shore_model_Rhiz)
+
+Treatment_Mean_model_Rhiz=gam(Rhizome_Stock_g_per_sqm ~ Factor, data=BlueCarbon_QAQC,method="ML")
+summary(Treatment_Mean_model_Rhiz)
+plot.gam(Treatment_Mean_model_Rhiz,all.terms=TRUE)
+
+Meadow_Structure_Rhiz=gam((Rhizome_Stock_g_per_sqm)~ Meadow.Structure, data=BlueCarbon_QAQC,method="ML")
+summary(Meadow_Structure_Rhiz)
+
+cor(BlueCarbon_QAQC[c(cont.preds,"Rhizome_Stock_g_per_sqm")],)
+
+full_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ 
+                     #  (HA_PA)+
+                     # (TH_PA) +
+                     #       (SY_PA) +
+                      # Meadow.Structure+
+                     s(Total_Seagrass_Cover,bs="ts",k=4)+   
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                        s(Current.Velocity.Max,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4) +
+                     s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                      s(Salinity.Min,bs="ts",k=4)   +
+    s(Primary.productivity.Max,bs="ts",k=4)+
+     s(Temperature.Mean,bs="ts",k=4)+
+                    s(Percent_Silt,bs="ts",k=4)+
+                    s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
+
+summary(full_model_Rhiz)
+
+
+stepwise_model_Rhiz=gam(Rhizome_Stock_g_per_sqm~ 
+      #  (HA_PA)+
+                     # (TH_PA) +
+                     #       (SY_PA) +
+                      # Meadow.Structure+
+                     s(Total_Seagrass_Cover,bs="ts",k=4)+   
+                    # s(Epiphyte_Load,bs="ts",k=4)+
+                        s(Current.Velocity.Max,bs="ts",k=4)+
+                     # s(Dist_To_River,bs="ts",k=4) +
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     # s(Nitrate.Mean,bs="ts",k=4)+
+                      s(Salinity.Min,bs="ts",k=4),
+    # s(Dist_To_River,bs="ts",k=4),
+     # s(Temperature.Mean,bs="ts",k=4),
+                    # s(Percent_Silt,bs="ts",k=4),
+                    # s(Depth_m,bs="ts",k=4),
+                     data=BlueCarbon_QAQC,method="ML")
+
+summary(stepwise_model_Rhiz)
+draw(stepwise_model_Rhiz)
+
+AIC(full_model_Rhiz,stepwise_model_Rhiz)
+
+gam.check(stepwise_model_Rhiz)
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Primary.productivity.Max,fill=Region))+geom_boxplot()
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Dist_To_River,fill=Region))+geom_boxplot()
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Nitrate.Mean,fill=Region))+geom_boxplot()
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(x=Salinity.Min,fill=Region))+geom_boxplot()
+
+```
+
+
+#GAM Organic Carbon Stock
+```{r}
+
+# Secchi_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Secchi_model_OCD)
+# plot(Secchi_model_OCD)
+
+Depth_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ s(Depth_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Depth_model_OCD)
+
+Seagrass_Cover_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm )~ s(Total_Seagrass_Cover,bs="ts",k=4) + s(Total_Algae_Cover,bs="ts",k=4) + Factor, data=BlueCarbon_QAQC,method="ML")
+summary(Seagrass_Cover_model_OCD)
+plot(Seagrass_Cover_model_OCD)
+
+SPP_PA_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ TH_PA + HA_PA +SY_PA, data=BlueCarbon_QAQC,method="ML")
+summary(SPP_PA_model_OCD)
+
+Seagrass_Spp_Cover_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm )~ s(Thalassia.testudinum.AreaCover,bs="ts",k=4) + s(Syringodium.filiforme.AreaCover,bs="ts",k=4) + s(Halodule.wrightii.AreaCover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+summary(Seagrass_Spp_Cover_model_OCD)
+
+
+Seagrass_Biomass_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm )~ s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4) + s(Rhizome_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+summary(Seagrass_Biomass_model_OCD)
+
+Meadow_Structure_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ Meadow.Structure, data=BlueCarbon_QAQC,method="ML")
+summary(Meadow_Structure_OCD)
+
+# Epiphytes_Structure_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~                     s(Epiphyte_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Epiphytes_Structure_OCD)
+
+# Sand_model_OCD=gam(Organic_Carbon_Stock_g_per_sqm ~ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Sand_model_OCD)
+
+Sediment_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Sediment_model_OCD)
+
+Nitrate_Mean_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Nitrate_Mean_model_OCD)
+
+Salinity_min_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Salinity_min_model_OCD)
+
+PP_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(PP_model_OCD)
+
+CV_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(CV_model_OCD)
+
+
+Temperature_Mean_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Temperature_Mean_model_OCD)
+
+Par_Mean_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Par.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Par_Mean_model_OCD)
+
+Light_Min_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ s(Light.bottom.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Light_Min_model_OCD)
+
+Dist_To_Shore_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Dist_To_Shore_model_OCD)
+
+Dist_from_River_Shore_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Dist_from_River_Shore_model_OCD)
+
+Treatment_Mean_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm)~ Factor, data=BlueCarbon_QAQC,method="ML")
+summary(Treatment_Mean_model_OCD)
+
+
+cor(BlueCarbon_QAQC[c(cont.preds,"Organic_Carbon_Stock_g_per_sqm")],)
+
+BlueCarbon_QAQC<-BlueCarbon_QAQC%>%
+  mutate(Meadow.Type=ifelse(Meadow.Structure=="Continuous",2,ifelse(Meadow.Structure=="Fragmented",1,0)))%>%
+  mutate(Meadow.Type=as.factor(Meadow.Type))
+
+full_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ 
+                     s(Par.Mean,bs="ts",k=4)+
+                     s(Dist_To_Shore,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4) +
+                       s(Salinity.Min,bs="ts",k=4)+
+                     s(Current.Velocity.Max,bs="ts",k=4)+
+    # s(Primary.productivity.Max,bs="ts",k=4)+
+     s(Temperature.Mean,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4) +
+                     s(Percent_Silt,bs="ts",k=4) + 
+                     s(Light.bottom.Min,bs="ts",k=4)+
+                      s(Depth_m,bs="ts",k=4)+
+      # s(Total_Seagrass_Cover,bs="ts",k=4)+
+      Meadow.Type+
+                       # # Factor +
+                     SY_PA,
+                   data=BlueCarbon_QAQC,method="ML")
+
+summary(full_model_OCD)
+
+stepwise_model_OCD=gam((Organic_Carbon_Stock_g_per_sqm) ~ 
+                      s(Par.Mean,bs="ts",k=4)+
+                     # s(Dist_To_Shore,bs="ts",k=4)+
+                     # s(Nitrate.Mean,bs="ts",k=4) +
+                       # s(Salinity.Min,bs="ts",k=4)+
+                     s(Current.Velocity.Max,bs="ts",k=4)+
+    # s(Primary.productivity.Max,bs="ts",k=4)+
+     # s(Temperature.Mean,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4) +
+                     s(Percent_Silt,bs="ts",k=4) + 
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                      # s(Depth_m,bs="ts",k=4)+
+      # s(Total_Seagrass_Cover,bs="ts",k=4)+
+      Meadow.Type,
+                       # Factor ,
+                     # SY_PA,
+                   data=BlueCarbon_QAQC,method="ML")
+
+summary(stepwise_model_OCD)
+
+draw(stepwise_model_OCD)
+
+AIC(full_model_OCD,stepwise_model_OCD)
+
+gam.check(stepwise_model_OCD)
+
+shapiro.test(stepwise_model_OCD$residuals)
+
+BlueCarbon_QAQC%>%
+  ggplot(aes(Par.Mean,fill=Region))+geom_boxplot()
+
+```
+
+
+#GAM Carbonate Stock
+```{r}
+
+
+# Secchi_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Secchi_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Secchi_model_In)
+
+# Depth_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Depth_m,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Depth_model_In)
+#  
+
+# Seagrass_Cover_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~ s(Total_Seagrass_Cover,bs="ts",k=4) + s(Total_Algae_Cover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Seagrass_Cover_model_In)
+
+# SPP_PA_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ TH_PA + HA_PA +SY_PA, data=BlueCarbon_QAQC,method="ML")
+# summary(SPP_PA_model_In)
+
+# Seagrass_Spp_Cover_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~ s(Thalassia.testudinum.AreaCover,bs="ts",k=4) + s(Syringodium.filiforme.AreaCover,bs="ts",k=4) + s(Halodule.wrightii.AreaCover,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# 
+# summary(Seagrass_Spp_Cover_model_In)
+
+# Epiphytes_Structure_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~                     s(Epiphyte_Load,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Epiphytes_Structure_In)
+
+Shells_Biomass_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~  s(Shell_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+summary(Shells_Biomass_model_In)
+
+Seagrass_Biomass_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~ s(Seagrass_Biomass_g_per_sqm,bs="ts",k=4) + s(Rhizome_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+
+summary(Seagrass_Biomass_model_In)
+
+Meadow_Structure_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm )~Meadow.Structure, data=BlueCarbon_QAQC,method="ML")
+
+summary(Meadow_Structure_model_In)
+
+Sediment_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Percent_Gravel,bs="ts",k=4)+ s(Percent_Coarse,bs="ts",k=4) +s(Percent_Medium,bs="ts",k=4)+s(Percent_Fine,bs="ts",k=4) +s(Percent_Silt,bs="ts",k=4)
+                      , data=BlueCarbon_QAQC,method="ML")
+summary(Sediment_model_In)
+
+Nitrate_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Nitrate.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Nitrate_Mean_model_In)
+
+# Salinity_min_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Salinity.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Salinity_min_model_In)
+
+PP_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Primary.productivity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(PP_model_In)
+
+
+CV_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Current.Velocity.Max,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(CV_Mean_model_In)
+
+Temperature_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Temperature.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Temperature_Mean_model_In)
+
+
+Par_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Par.Mean,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Par_Mean_model_In)
+
+Light_Min_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Light.bottom.Min,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Light_Min_model_In)
+
+# Dist_To_Shore_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Dist_To_Shore,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_To_Shore_model_In)
+
+# Dist_from_River_Shore_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Dist_To_River,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Dist_from_River_Shore_model_In)
+
+# Treatment_Mean_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm)~ s(Dist_To_River,by=Factor,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+# summary(Treatment_Mean_model_In)
+
+Rhizomes_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ s(Rhizome_Stock_g_per_sqm,bs="ts",k=4), data=BlueCarbon_QAQC,method="ML")
+summary(Rhizomes_model_In)
+
+
+
+cor(BlueCarbon_QAQC[c(cont.preds,"Inorganic_Carbon_Stock_g_per_sqm")],)
+
+full_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
+                    s(Epiphyte_Load,bs="ts",k=4)+
+                    s(Shell_Stock_g_per_sqm,bs="ts",k=4)+
+                     s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                      # s(Primary.productivity.Max,bs="ts",k=4)+
+     s(Temperature.Mean,bs="ts",k=4)+
+                  s(Par.Mean,bs="ts",k=4)+
+                     s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Percent_Gravel,bs="ts",k=4)+
+                    # s(Percent_Fine,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4)+
+                     s(Dist_To_River,bs="ts",k=4)+
+                    # s(Total_Seagrass_Cover,bs="ts",k=4)+
+                     Meadow.Type, 
+                     data=BlueCarbon_QAQC,method="ML")
+
+summary(full_model_In)
+
+
+stepwise_model_In=gam((Inorganic_Carbon_Stock_g_per_sqm) ~ 
+               # s(Epiphyte_Load,bs="ts",k=4)+
+                    # s(Shell_Stock_g_per_sqm,bs="ts",k=4)+
+                     # s(Nitrate.Mean,bs="ts",k=4)+
+                    s(Current.Velocity.Max,bs="ts",k=4)+
+                      # s(Primary.productivity.Max,bs="ts",k=4)+
+     # s(Temperature.Mean,bs="ts",k=4)+
+                  # s(Par.Mean,bs="ts",k=4)+
+                     # s(Light.bottom.Min,bs="ts",k=4)+
+                     s(Percent_Gravel,bs="ts",k=4)+
+                    # s(Percent_Fine,bs="ts",k=4) +
+                    s(Percent_Silt,bs="ts",k=4),
+                    # s(Total_Seagrass_Cover,bs="ts",k=4),
+                     # Meadow.Type,
+                     data=BlueCarbon_QAQC,method="ML")
+
+summary(stepwise_model_In)
+
+draw(stepwise_model_In)
+
+gam.check(stepwise_model_In)
+
+save.image(file="C:/Users/jennm/Dropbox/GITHUB/Disseratation/Saved_RData/Blue_Carbon_Modeling_Spring2021.RData")
+
+```
+
+
+#Finding the best model for Organic Carbon Stocks
+```{r}
+library(FSSgam)
+names(BlueCarbon_QAQC)
+
+
+BlueCarbon_QAQC=BlueCarbon_QAQC[complete.cases(BlueCarbon_QAQC),]
+
+BlueCarbon_QAQC=BlueCarbon_QAQC%>%
+  mutate(TH_PA=as.factor(TH_PA),SY_PA=as.factor(SY_PA),HA_PA=as.factor(HA_PA),Factor=as.factor(Factor)) %>%
+  mutate(Percent_Sands=Percent_Coarse+Percent_Medium+Percent_Fine)
+
+OC_gam_base=mgcv::gam(Organic_Carbon_Stock_g_per_sqm ~ 1,data=BlueCarbon_QAQC,method="ML")
+
+gam.check(OC_gam_base)
+
+#Model Selection 
+##################################################################################
+cat.preds=c("TH_PA","SY_PA","HA_PA","Factor")
+null.vars=c("Region","Site")
+cont.preds=c("Depth_m","Dist_To_Shore","Dist_To_River","Nitrate.Mean", "Par.Mean",
+             "Rhizome_Stock_g_per_sqm", 
+             "Total_Algae_Cover", 
+             "Total_Seagrass_Cover",
+             "Percent_Gravel",
+             "Percent_Sands","Percent_Silt")
+
+
+
+Collinearity_OC=as.data.frame(round(cor(BlueCarbon_QAQC[c(cont.preds,"Organic_Carbon_Stock_g_per_sqm")],),2))
+
+model.set.OC=generate.model.set(use.dat=BlueCarbon_QAQC, 
+                                  test.fit=OC_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = null.vars,
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.70,
+                          max.predictors =5 ,
+                          k=4, bs.arg="'ts'")
+
+
+out.list.OC=fit.model.set(model.set.OC)
+
+
+#examine the output
+names(out.list.OC)
+out.list.OC$failed.models
+length(out.list.OC$success.models)
+mod.table.OC=out.list.OC$mod.data.out
+mod.table.OC=mod.table.OC[order(mod.table.OC$AICc),]
+head(mod.table.OC)
+
+
+OC_ModelTable=mod.table.OC
+
+all.less.2AICc.OC=OC_ModelTable[which(OC_ModelTable$delta.AICc<2),]
+all.less.2AICc.OC$formula
+
+
+write.csv(OC_ModelTable,file ="model_output/OC_ModelTable.csv")
+
+
+#final models
+final_model_OC=mgcv::gam(Organic_Carbon_Stock_g_per_sqm ~
+                           # HA_PA+
+                           te(Rhizome_Stock_g_per_sqm,Percent_Gravel,bs="ts",k=3) +
+                           s(Seagrass_Biomass_g_per_sqm, by=SY_PA, bs="ts",k=3) +
+                           s(Percent_Silt,bs="ts",k=3) +
+                           SY_PA,
+                         data=BlueCarbon_QAQC, method="ML")
+
+summary(final_model_OC)
+
+draw(final_model_OC)
+
+shapiro.test(final_model_OC$residuals)
+
+gam.check(final_model_OC)
+
+```
+
+
+#Finding the best model for Carbonate Stocks
+```{r}
+
+CARBONATE_gam_base=mgcv::gam(Inorganic_Carbon_Stock_g_per_sqm ~ 1,data=BlueCarbon_QAQC,method="ML")
+
+gam.check(CARBONATE_gam_base)
+
+#Model Selection 
+##################################################################################
+
+
+model.set.CARBONATE=generate.model.set(use.dat=BlueCarbon_QAQC, 
+                                  test.fit=CARBONATE_gam_base,
+                          pred.vars.cont=cont.preds,
+                          # cyclic.vars="month",
+                          pred.vars.fact=cat.preds,
+                          # null.terms = null.vars,
+                          # factor.factor.interactions = TRUE,
+                          smooth.smooth.interactions = TRUE,
+                          cov.cutoff = 0.70,
+                          max.predictors = 5,
+                          k=4, bs.arg="'ts'")
+
+
+out.list.CARBONATE=fit.model.set(model.set.CARBONATE)
+
+
+#examine the output
+names(out.list.CARBONATE)
+out.list.CARBONATE$failed.models
+length(out.list.CARBONATE$success.models)
+mod.table.CARBONATE=out.list.CARBONATE$mod.data.out
+mod.table.CARBONATE=mod.table.CARBONATE[order(mod.table.CARBONATE$AICc),]
+head(mod.table.CARBONATE)
+
+
+CARBONATE_ModelTable=mod.table.CARBONATE
+
+all.less.2AICc.CARBONATE=CARBONATE_ModelTable[which(CARBONATE_ModelTable$delta.AICc<2),]
+all.less.2AICc.CARBONATE$formula
+
+
+write.csv(CARBONATE_ModelTable,file ="model_output/CARBONATE_ModelTable.csv")
+
+#final models
+final_model_CARBONATE=mgcv::gam(Inorganic_Carbon_Stock_g_per_sqm ~
+                                  # s(Seagrass_Spp, bs="ts",k=4) +
+                                  s(Nitrate.Mean,bs="ts",k=4) +                                             s(Percent_Silt,bs="ts",k=4) +
+                                  s(Percent_Gravel,bs="ts",k=4),
+                                  # HA_PA,
+                                data=BlueCarbon_QAQC, method="ML")
+
+summary(final_model_CARBONATE)
+
+draw(final_model_CARBONATE)
+
+shapiro.test(final_model_OC$residuals)
+
+gam.check(final_model_OC)
+
+```
+
